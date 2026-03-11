@@ -1,0 +1,194 @@
+@page
+@model ZkbioDashboard.Pages.PersonalAttendanceModel
+@{
+    ViewData["Title"] = "Personnel Access History";
+}
+
+<style>
+    .at-page-header { margin: 8px 20px 4px; }
+    .at-page-header h1 { margin: 0; font-size: 0.95rem; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; }
+
+    .at-filter-card { margin: 0 20px 8px; background: #fff; border-radius: 16px; position: relative; }
+    .at-filter-body { padding: 10px 14px; }
+    .at-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 8px;
+        align-items: end;
+    }
+    .at-filter-grid label { display: block; font-size: 0.72rem; font-weight: 700; color: #64748b; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .at-filter-grid .form-control { height: 34px; font-size: 0.8rem; border-radius: 10px; border: 1px solid #dbe3ee; padding: 0 10px; }
+    .at-filter-actions { display: flex; gap: 6px; align-items: flex-end; }
+    .at-btn { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; border: none; cursor: pointer; gap: 6px; transition: opacity 0.15s; }
+    .at-btn:hover { opacity: 0.88; }
+    .at-btn-primary { background: linear-gradient(135deg, #15803d, #22c55e); color: #fff; }
+    .at-btn-ghost { background: #f1f5f9; color: #334155; border: 1px solid #dbe3ee; text-decoration: none; }
+
+    .at-table-card { margin: 0 20px 0; background: #fff; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; }
+    .at-table-scroll { overflow-y: auto; flex: 1 1 0; }
+    .at-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .at-table thead th { position: sticky; top: 0; background: #f8fafc; font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; padding: 7px 10px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+    .at-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.12s; }
+    .at-table tbody tr:nth-child(odd)  { background: #ffffff; }
+    .at-table tbody tr:nth-child(even) { background: #f5f8fb; }
+    .at-table tbody tr:hover           { background: rgba(21,128,61,0.07) !important; }
+    .at-table tbody td { padding: 5px 10px; color: #0f172a; font-size: 0.8rem; white-space: nowrap; }
+
+    .at-btn-detail { height: 24px; padding: 0 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #f1f5f9; color: #334155; border: 1px solid #dbe3ee; cursor: pointer; }
+    .at-btn-detail:hover { background: rgba(21,128,61,0.1); border-color: #15803d; color: #15803d; }
+
+    .at-legend { padding: 6px 14px 8px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #f1f5f9; display: flex; flex-wrap: wrap; gap: 12px; }
+    .at-legend b { color: #334155; }
+
+    .at-empty { text-align: center; padding: 32px 16px; color: #94a3b8; font-size: 0.85rem; }
+</style>
+
+@section Scripts {
+    <script>
+        function viewDetails(pin, date) {
+            $('#modalEmployeeHeader').text(pin);
+            $('#modalDateHeader').text(date);
+            $('#detailsTableBody').empty();
+            $('#detailsTable').hide();
+            $('#loadingIndicator').show();
+            $('#detailsModal').modal('show');
+
+            $.ajax({
+                url: '?handler=Details',
+                type: 'GET',
+                data: { pin: pin, date: date },
+                success: function (data) {
+                    $('#loadingIndicator').hide();
+                    if (data && data.length > 0) {
+                        renderTransactionRows(data, '#detailsTableBody');
+                        $('#detailsTable').show();
+                    } else {
+                        $('#detailsTableBody').append('<tr><td colspan="7" class="text-center">No records found.</td></tr>');
+                        $('#detailsTable').show();
+                    }
+                },
+                error: function () {
+                    $('#loadingIndicator').hide();
+                    alert('Error fetching details.');
+                }
+            });
+        }
+    </script>
+}
+
+<section class="content" style="padding:0;">
+    <div class="container-fluid px-0 d-flex flex-column" style="height:calc(100vh - 57px); overflow:hidden; gap:0;">
+
+        <div class="at-page-header">
+            <h1>Personnel Access History</h1>
+        </div>
+
+        <div class="at-filter-card">
+            <div class="at-filter-body">
+                <form method="get">
+                    <div class="at-filter-grid">
+                        <div>
+                            <label>PIN</label>
+                            <input type="text" asp-for="Pin" class="form-control" placeholder="Search PIN..." required />
+                        </div>
+                        <div>
+                            <label>From</label>
+                            <input type="datetime-local" asp-for="FromDate" class="form-control" required step="1" />
+                        </div>
+                        <div>
+                            <label>To</label>
+                            <input type="datetime-local" asp-for="ToDate" class="form-control" required step="1" />
+                        </div>
+                        <div class="at-filter-actions">
+                            <button type="submit" class="at-btn at-btn-primary" title="Search">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <a asp-page="./PersonalAttendance" class="at-btn at-btn-ghost" title="Reset">
+                                <i class="fas fa-undo-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="at-legend">
+                <span><b>[B]</b> Missing 2+2 records</span>
+                <span><b>[C1]</b> Gate Entry 30m Early</span>
+                <span><b>[C2]</b> Gate Exit &gt; 30m after Attend Out</span>
+                <span><b>[D1]</b> Late Arrival</span>
+                <span><b>[D2]</b> Early Departure</span>
+            </div>
+        </div>
+
+        <div class="at-table-card">
+            <div class="at-table-scroll">
+                <table class="at-table js-sortable-table">
+                    <thead>
+                        <tr>
+                            <th>Factory</th>
+                            <th>BU</th>
+                            <th>Dept</th>
+                            <th>PIN</th>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Shift Date</th>
+                            <th>Gate In</th>
+                            <th>Attend In</th>
+                            <th>Attend Out</th>
+                            <th>Gate Out</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="skeleton-loader">
+                        @for (int i = 0; i < 10; i++)
+                        {
+                            <tr>
+                                @for (int j = 0; j < 12; j++)
+                                {
+                                    <td><div class="skeleton skeleton-text"></div></td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                    <tbody id="table-data">
+                        @if (Model.Records != null && Model.Records.Any())
+                        {
+                            foreach (var r in Model.Records)
+                            {
+                                <tr>
+                                    <td>@r.Factory</td>
+                                    <td>@r.BU</td>
+                                    <td>@r.DeptName</td>
+                                    <td>@r.Pin</td>
+                                    <td>@r.FullName</td>
+                                    <td>@r.Evaluation</td>
+                                    <td>@r.Date.ToString("yyyy-MM-dd")</td>
+                                    <td>@(r.GateIn?.ToString("HH:mm:ss") ?? "-")</td>
+                                    <td>@(r.AttendIn?.ToString("HH:mm:ss") ?? "-")</td>
+                                    <td>@(r.AttendOut?.ToString("HH:mm:ss") ?? "-")</td>
+                                    <td>@(r.GateOut?.ToString("HH:mm:ss") ?? "-")</td>
+                                    <td>
+                                        <button type="button" class="at-btn-detail"
+                                                onclick="viewDetails('@r.Pin', '@r.Date.ToString("yyyy-MM-dd")')">
+                                            Details
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else if (!string.IsNullOrEmpty(Model.Pin))
+                        {
+                            <tr><td colspan="12" class="at-empty">No records found for the specified PIN and date range.</td></tr>
+                        }
+                        else
+                        {
+                            <tr><td colspan="12" class="at-empty">Please enter a PIN to view history.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+@await Html.PartialAsync("_TransactionDetailsModal")

@@ -1,0 +1,650 @@
+@page
+@model ZkbioDashboard.Pages.AllTransactionModel
+@{
+    ViewData["Title"] = "All Transactions";
+}
+
+<style>
+    /* ── Page header ──────────────────────────────────────────── */
+    .at-page-header {
+        margin: 8px 20px 4px;
+    }
+    .at-page-header h1 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: #0f172a;
+    }
+
+    /* ── Filter card ──────────────────────────────────────────── */
+    .at-filter-card {
+        margin: 0 20px 10px;
+        background: #fff;
+        border-radius: 16px;
+        position: relative;
+    }
+    .at-filter-body {
+        padding: 12px 16px;
+    }
+    .at-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr) auto;
+        gap: 8px;
+        align-items: end;
+    }
+    .at-filter-grid label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #334155;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .at-filter-grid .form-control,
+    .at-filter-grid select.form-control {
+        height: 34px;
+        font-size: 0.82rem;
+        border-radius: 9px;
+        border: 1px solid #dbe3ee;
+        padding: 0 10px;
+        color: #0f172a;
+        background: #f8fafc;
+        transition: border-color 0.18s, box-shadow 0.18s;
+    }
+    .at-filter-grid .form-control:focus {
+        border-color: rgba(21, 128, 61, 0.5);
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+        outline: none;
+        background: #fff;
+    }
+    .at-filter-actions {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        padding-bottom: 1px;
+    }
+    .at-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 9px;
+        font-size: 0.81rem;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: filter 0.18s, box-shadow 0.18s, transform 0.15s;
+        white-space: nowrap;
+    }
+    .at-btn:hover { transform: translateY(-1px); }
+    .at-btn-primary {
+        background: linear-gradient(135deg, #15803d, #16a34a);
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(21,128,61,0.22);
+    }
+    .at-btn-primary:hover { box-shadow: 0 6px 16px rgba(21,128,61,0.3); color: #fff; }
+    .at-btn-secondary {
+        background: #fff;
+        color: #334155;
+        border: 1px solid #dbe3ee;
+        box-shadow: 0 1px 4px rgba(15,23,42,0.06);
+    }
+    .at-btn-secondary:hover { border-color: #94a3b8; color: #0f172a; }
+    .at-btn-ghost {
+        background: transparent;
+        color: #64748b;
+        border: 1px solid #dbe3ee;
+    }
+    .at-btn-ghost:hover { color: #334155; background: #f1f5f9; }
+
+    /* Export dropdown */
+    .at-export-wrap { position: relative; }
+    .at-export-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        min-width: 160px;
+        background: #fff;
+        border: 1px solid #dbe3ee;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(15,23,42,0.12);
+        z-index: 200;
+        overflow: hidden;
+    }
+    .at-export-menu.open { display: block; }
+    .at-export-menu a {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 14px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #334155;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+    .at-export-menu a:hover { background: #f1f5f9; }
+
+    /* ── Table area ───────────────────────────────────────────── */
+    .at-table-card {
+        margin: 0 20px 20px;
+        background: #fff;
+        border-radius: 16px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    .at-table-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        flex-shrink: 0;
+    }
+    .at-table-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #334155;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .at-table-scroll {
+        overflow-y: auto;
+        flex: 1 1 0;
+    }
+    .at-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+    }
+    .at-table thead th {
+        position: sticky;
+        top: 0;
+        background: #f8fafc;
+        padding: 7px 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        border-bottom: 1px solid #e2e8f0;
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+    }
+    .at-table thead th:hover { color: #15803d; }
+    .at-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.12s;
+    }
+    .at-table tbody tr:nth-child(odd)  { background: #ffffff; }
+    .at-table tbody tr:nth-child(even) { background: #f5f8fb; }
+    .at-table tbody tr:hover           { background: rgba(21, 128, 61, 0.07) !important; }
+    .at-table tbody td {
+        padding: 5px 10px;
+        color: #0f172a;
+        white-space: nowrap;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+
+    /* Badges */
+    .at-badge {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+    .at-badge-ok   { background: rgba(21,128,61,0.1);  color: #15803d; }
+    .at-badge-err  { background: rgba(220,38,38,0.08); color: #b91c1c; }
+    .at-badge-mute { background: #f1f5f9; color: #64748b; }
+
+    /* ── Footer / pagination ──────────────────────────────────── */
+    .at-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px;
+        border-top: 1px solid #f1f5f9;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .at-footer-total {
+        font-size: 0.78rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .at-pagination {
+        display: flex;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        gap: 3px;
+    }
+    .at-pagination li a,
+    .at-pagination li span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 6px;
+        border-radius: 7px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #334155;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: all 0.15s;
+    }
+    .at-pagination li a:hover { background: #f1f5f9; border-color: #dbe3ee; }
+    .at-pagination li.active a { background: #15803d; color: #fff; border-color: #15803d; }
+    .at-pagination li.disabled a { color: #cbd5e1; pointer-events: none; }
+
+    /* ── Date preset pills ───────────────────────────────────── */
+    .at-preset-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    .at-preset {
+        display: inline-flex;
+        align-items: center;
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        border: 1px solid #dbe3ee;
+        background: #f8fafc;
+        color: #334155;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+        white-space: nowrap;
+        user-select: none;
+    }
+    .at-preset:hover {
+        background: rgba(21,128,61,0.08);
+        border-color: rgba(21,128,61,0.35);
+        color: #15803d;
+    }
+    .at-preset.active {
+        background: rgba(21,128,61,0.12);
+        border-color: #15803d;
+        color: #15803d;
+    }
+
+    /* Empty state */
+    .at-empty {
+        text-align: center;
+        padding: 32px 16px;
+        color: #94a3b8;
+        font-size: 0.85rem;
+    }
+</style>
+
+
+<section class="content" style="padding:0;">
+    <div class="container-fluid px-0 d-flex flex-column" style="height:calc(100vh - 57px); overflow:hidden; gap:0;">
+
+        <div class="at-page-header">
+            <h1>All Transactions</h1>
+        </div>
+
+        <!-- Filter -->
+        <div class="at-filter-card">
+            <div class="at-filter-body">
+                <form method="get" id="filterForm">
+                    <!-- Preset date range pills -->
+                    <div class="at-preset-row">
+                        <span class="at-preset" data-preset="today">Today</span>
+                        <span class="at-preset" data-preset="yesterday">Yesterday</span>
+                        <span class="at-preset" data-preset="7days">Last 7 days</span>
+                        <span class="at-preset" data-preset="thismonth">This month</span>
+                        <span class="at-preset" data-preset="lastmonth">Last month</span>
+                    </div>
+                    <div class="at-filter-grid">
+                        <div>
+                            <label>From</label>
+                            <input type="datetime-local" asp-for="Filter.FromDate" class="form-control" step="1" />
+                        </div>
+                        <div>
+                            <label>To</label>
+                            <input type="datetime-local" asp-for="Filter.ToDate" class="form-control" step="1" />
+                        </div>
+                        <div>
+                            <label>Area</label>
+                            <input type="text" asp-for="Filter.AreaName" class="form-control" />
+                        </div>
+                        <div>
+                            <label>Dept</label>
+                            <input type="text" asp-for="Filter.DeptName" class="form-control" />
+                        </div>
+                        <div>
+                            <label>PIN</label>
+                            <input type="text" asp-for="Filter.Pin" class="form-control" />
+                        </div>
+                        <div>
+                            <label>Name</label>
+                            <input type="text" asp-for="Filter.Name" class="form-control" />
+                        </div>
+                        <div>
+                            <label>Device</label>
+                            <input type="text" asp-for="Filter.DevAlias" class="form-control" />
+                        </div>
+                        <div>
+                            <label>Status</label>
+                            <select asp-for="Filter.Status" class="form-control">
+                                <option value="">All</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Exception">Exception</option>
+                            </select>
+                        </div>
+                        <div class="at-filter-actions">
+                            <button type="submit" class="at-btn at-btn-primary" title="Apply Filters">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <div class="at-export-wrap">
+                                <button type="button" class="at-btn at-btn-secondary" id="btnExportToggle" title="Export">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <div class="at-export-menu" id="exportMenuDropdown">
+                                    <a href="javascript:void(0)" onclick="openExportModal('excel')">
+                                        <i class="far fa-file-excel" style="color:#16a34a;"></i> Excel
+                                    </a>
+                                    <a href="javascript:void(0)" onclick="openExportModal('pdf')">
+                                        <i class="far fa-file-pdf" style="color:#dc2626;"></i> PDF
+                                    </a>
+                                </div>
+                            </div>
+                            <a asp-page="./AllTransaction" class="at-btn at-btn-ghost" title="Reset">
+                                <i class="fas fa-undo-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div class="modal fade" id="exportModal" tabindex="-1" role="dialog" aria-labelledby="exportModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content" style="border-radius:18px; overflow:hidden; border:1px solid #dbe3ee; box-shadow:0 20px 50px rgba(15,23,42,0.15);">
+                    <form id="exportForm" method="post" action="">
+                        <div class="modal-header" style="border-bottom:1px solid #f1f5f9; padding:16px 20px;">
+                            <h5 class="modal-title" id="exportModalLabel" style="font-size:0.95rem; font-weight:700; color:#0f172a;">Select Columns to Export</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body" style="padding:16px 20px;">
+                            <input type="hidden" name="FromDate"   id="exportFromDate" />
+                            <input type="hidden" name="ToDate"     id="exportToDate" />
+                            <input type="hidden" name="AreaName"   id="exportAreaName" />
+                            <input type="hidden" name="DeptName"   id="exportDeptName" />
+                            <input type="hidden" name="Pin"        id="exportPin" />
+                            <input type="hidden" name="Name"       id="exportName" />
+                            <input type="hidden" name="DevAlias"   id="exportDevAlias" />
+                            <input type="hidden" name="EventPoint" id="exportEventPoint" />
+                            <input type="hidden" name="Status"     id="exportStatus" />
+
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="selectAllColumns" checked>
+                                <label class="form-check-label" style="font-weight:700; font-size:0.83rem;" for="selectAllColumns">Select All</label>
+                            </div>
+                            <hr style="margin:8px 0;" />
+                            <div class="row" style="row-gap:4px;">
+                                @{
+                                    var columns = new[] {
+                                        ("Time",             "Time"),
+                                        ("Area Name",        "Area"),
+                                        ("Dept Name",        "Dept"),
+                                        ("PIN",              "PIN"),
+                                        ("Name",             "Name"),
+                                        ("Device Alias",     "Device"),
+                                        ("Event Point Name", "Event Point"),
+                                        ("Status",           "Status"),
+                                        ("Verify Mode",      "Verify"),
+                                    };
+                                    foreach (var (val, lbl) in columns)
+                                    {
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input column-checkbox" type="checkbox" name="selectedColumns" value="@val" id="col_@val.Replace(" ", "")" checked>
+                                                <label class="form-check-label" style="font-size:0.82rem;" for="col_@val.Replace(" ", "")">@lbl</label>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                        <div class="modal-footer" style="border-top:1px solid #f1f5f9; padding:12px 20px; gap:8px;">
+                            <button type="button" class="at-btn at-btn-ghost" data-dismiss="modal">Cancel</button>
+                            <button type="submit" class="at-btn at-btn-primary" id="btnConfirmExport">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="at-table-card flex-fill" style="margin-bottom:0; min-height:0;">
+            <div class="at-table-scroll">
+                <table id="transactionTable" class="at-table js-sortable-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Area</th>
+                            <th>Dept</th>
+                            <th>PIN</th>
+                            <th>Name</th>
+                            <th>Device</th>
+                            <th>Event Point</th>
+                            <th>Status</th>
+                            <th>Verify</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Transactions != null)
+                        {
+                            foreach (var item in Model.Transactions)
+                            {
+                                <tr>
+                                    <td>@item.EventTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    <td>@item.AreaName</td>
+                                    <td>@item.DeptName</td>
+                                    <td>@item.Pin</td>
+                                    <td>@item.FullName</td>
+                                    <td>@item.DevAlias</td>
+                                    <td>@item.EventPointName</td>
+                                    <td>
+                                        @if (item.Status == "Normal")
+                                        {
+                                            <span class="at-badge at-badge-ok">Normal</span>
+                                        }
+                                        else if (item.Status == "Exception")
+                                        {
+                                            <span class="at-badge at-badge-err">Exception</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="at-badge at-badge-mute">@item.Status</span>
+                                        }
+                                    </td>
+                                    <td>@item.VerifyModeDisplay</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="9" class="at-empty">No data found or connection error.</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="at-footer">
+                <ul class="at-pagination">
+                    <li style="display:flex;align-items:center;padding:0 8px;">
+                        <span class="at-footer-total">@Model.TotalCount.ToString("N0") records</span>
+                    </li>
+                    <li class="@(Model.PageNumber == 1 ? "disabled" : "")">
+                        <a asp-page="./AllTransaction"
+                           asp-route-PageNumber="@(Model.PageNumber - 1)"
+                           asp-route-Filter.FromDate="@Model.Filter.FromDate?.ToString("yyyy-MM-ddTHH:mm")"
+                           asp-route-Filter.ToDate="@Model.Filter.ToDate?.ToString("yyyy-MM-ddTHH:mm")"
+                           asp-route-Filter.AreaName="@Model.Filter.AreaName"
+                           asp-route-Filter.DeptName="@Model.Filter.DeptName"
+                           asp-route-Filter.Pin="@Model.Filter.Pin"
+                           asp-route-Filter.Name="@Model.Filter.Name"
+                           asp-route-Filter.DevAlias="@Model.Filter.DevAlias"
+                           asp-route-Filter.EventPoint="@Model.Filter.EventPoint"
+                           asp-route-Filter.Status="@Model.Filter.Status">&laquo;</a>
+                    </li>
+                    @for (int i = Math.Max(1, Model.PageNumber - 5); i <= Math.Min(Model.TotalPages, Model.PageNumber + 5); i++)
+                    {
+                        <li class="@(i == Model.PageNumber ? "active" : "")">
+                            <a asp-page="./AllTransaction"
+                               asp-route-PageNumber="@i"
+                               asp-route-Filter.FromDate="@Model.Filter.FromDate?.ToString("yyyy-MM-ddTHH:mm")"
+                               asp-route-Filter.ToDate="@Model.Filter.ToDate?.ToString("yyyy-MM-ddTHH:mm")"
+                               asp-route-Filter.AreaName="@Model.Filter.AreaName"
+                               asp-route-Filter.DeptName="@Model.Filter.DeptName"
+                               asp-route-Filter.Pin="@Model.Filter.Pin"
+                               asp-route-Filter.Name="@Model.Filter.Name"
+                               asp-route-Filter.DevAlias="@Model.Filter.DevAlias"
+                               asp-route-Filter.EventPoint="@Model.Filter.EventPoint"
+                               asp-route-Filter.Status="@Model.Filter.Status">@i</a>
+                        </li>
+                    }
+                    <li class="@(Model.PageNumber == Model.TotalPages ? "disabled" : "")">
+                        <a asp-page="./AllTransaction"
+                           asp-route-PageNumber="@(Model.PageNumber + 1)"
+                           asp-route-Filter.FromDate="@Model.Filter.FromDate?.ToString("yyyy-MM-ddTHH:mm")"
+                           asp-route-Filter.ToDate="@Model.Filter.ToDate?.ToString("yyyy-MM-ddTHH:mm")"
+                           asp-route-Filter.AreaName="@Model.Filter.AreaName"
+                           asp-route-Filter.DeptName="@Model.Filter.DeptName"
+                           asp-route-Filter.Pin="@Model.Filter.Pin"
+                           asp-route-Filter.Name="@Model.Filter.Name"
+                           asp-route-Filter.DevAlias="@Model.Filter.DevAlias"
+                           asp-route-Filter.EventPoint="@Model.Filter.EventPoint"
+                           asp-route-Filter.Status="@Model.Filter.Status">&raquo;</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        $(function () {
+            // Select All columns logic
+            $('#selectAllColumns').on('change', function () {
+                $('.column-checkbox').prop('checked', this.checked);
+            });
+            $('.column-checkbox').on('change', function () {
+                var all = $('.column-checkbox').length;
+                var checked = $('.column-checkbox:checked').length;
+                $('#selectAllColumns').prop('checked', all === checked);
+            });
+
+            // PIN auto-format
+            $('#Pin, [name="Pin"], #Filter_Pin, [name="Filter.Pin"]').on('input change blur', function () {
+                var s = this.selectionStart, e = this.selectionEnd;
+                $(this).val($(this).val().replace(/\s+/g, '').toUpperCase());
+                this.setSelectionRange(s, e);
+            });
+
+            // Export dropdown toggle
+            $('#btnExportToggle').on('click', function (ev) {
+                ev.stopPropagation();
+                $('#exportMenuDropdown').toggleClass('open');
+            });
+            $(document).on('click', function () {
+                $('#exportMenuDropdown').removeClass('open');
+            });
+
+            // ── Date preset pills ───────────────────────────────────
+            function fmtDate(d) {
+                // Format a Date to 'YYYY-MM-DD HH:mm:SS' for Flatpickr
+                var pad = n => String(n).padStart(2, '0');
+                return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+            }
+            function setDateRange(fromDate, toDate) {
+                // Find Flatpickr instances on the two datetime inputs
+                var fromInput = $('[name="Filter.FromDate"]')[0];
+                var toInput   = $('[name="Filter.ToDate"]')[0];
+                if (fromInput && fromInput._flatpickr) {
+                    fromInput._flatpickr.setDate(fromDate + ' 00:00:00', true);
+                } else {
+                    $('[name="Filter.FromDate"]').val(fromDate + ' 00:00:00');
+                }
+                if (toInput && toInput._flatpickr) {
+                    toInput._flatpickr.setDate(toDate + ' 23:59:59', true);
+                } else {
+                    $('[name="Filter.ToDate"]').val(toDate + ' 23:59:59');
+                }
+            }
+            $('.at-preset').on('click', function () {
+                $('.at-preset').removeClass('active');
+                $(this).addClass('active');
+                var now   = new Date();
+                var today = fmtDate(now);
+                var preset = $(this).data('preset');
+                if (preset === 'today') {
+                    setDateRange(today, today);
+                } else if (preset === 'yesterday') {
+                    var y = new Date(now); y.setDate(y.getDate() - 1);
+                    var yd = fmtDate(y);
+                    setDateRange(yd, yd);
+                } else if (preset === '7days') {
+                    var d7 = new Date(now); d7.setDate(d7.getDate() - 6);
+                    setDateRange(fmtDate(d7), today);
+                } else if (preset === 'thismonth') {
+                    var fm = new Date(now.getFullYear(), now.getMonth(), 1);
+                    setDateRange(fmtDate(fm), today);
+                } else if (preset === 'lastmonth') {
+                    var lm1 = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    var lm2 = new Date(now.getFullYear(), now.getMonth(), 0);
+                    setDateRange(fmtDate(lm1), fmtDate(lm2));
+                }
+                // Auto-submit
+                setTimeout(function() { $('#filterForm').submit(); }, 80);
+            });
+        });
+
+        function openExportModal(type) {
+            $('#exportFromDate').val($('[name="Filter.FromDate"]').val());
+            $('#exportToDate').val($('[name="Filter.ToDate"]').val());
+            $('#exportAreaName').val($('[name="Filter.AreaName"]').val());
+            $('#exportDeptName').val($('[name="Filter.DeptName"]').val());
+            $('#exportPin').val($('[name="Filter.Pin"]').val());
+            $('#exportName').val($('[name="Filter.Name"]').val());
+            $('#exportDevAlias').val($('[name="Filter.DevAlias"]').val());
+            $('#exportEventPoint').val($('[name="Filter.EventPoint"]').val());
+            $('#exportStatus').val($('[name="Filter.Status"]').val());
+            $('#exportForm').attr('action', '/api/export/' + type);
+            $('#exportModalLabel').text('Export — ' + type.toUpperCase());
+            $('#exportMenuDropdown').removeClass('open');
+            $('#exportModal').modal('show');
+        }
+    </script>
+}

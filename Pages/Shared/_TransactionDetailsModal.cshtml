@@ -1,0 +1,231 @@
+<!-- Transaction Details Modal Partial -->
+<div class="modal fade" id="detailsModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
+        <div class="modal-content txd-modal">
+            <div class="modal-header txd-head">
+                <h5 class="modal-title txd-title">
+                    Transaction Details
+                    <small class="txd-sub" id="modalEmployeeHeader"></small>
+                    <small class="txd-sub" id="modalDateHeader"></small>
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body txd-body p-0">
+                <div id="loadingIndicator" class="txd-loading">
+                    <div class="spinner-border" role="status"></div>
+                    <p>Loading transactions...</p>
+                </div>
+                <div class="table-responsive" id="detailsTable" style="display:none;">
+                    <table class="table mb-0 txd-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Area</th>
+                                <th>Mode</th>
+                                <th>Device</th>
+                                <th>Event Point</th>
+                                <th>Verify</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer txd-foot">
+                <button type="button" class="txd-btn" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .txd-modal {
+        border: 0;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 24px 52px rgba(15, 23, 42, 0.18);
+    }
+    .txd-head {
+        border-bottom: 1px solid #f1f5f9;
+        padding: 10px 14px;
+        background: #ffffff;
+    }
+    .txd-title {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: #0f172a;
+    }
+    .txd-sub {
+        margin-left: 8px;
+        font-size: 0.76rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .txd-body {
+        background: #ffffff;
+    }
+    .txd-loading {
+        text-align: center;
+        padding: 30px 12px;
+        color: #64748b;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+    .txd-loading .spinner-border {
+        width: 1.4rem;
+        height: 1.4rem;
+        border-width: 0.16rem;
+        color: #15803d;
+    }
+    .txd-loading p {
+        margin: 8px 0 0;
+    }
+    .txd-table {
+        font-size: 0.8rem;
+    }
+    .txd-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 7px 10px;
+        white-space: nowrap;
+    }
+    .txd-table tbody tr:nth-child(odd) {
+        background: #ffffff;
+    }
+    .txd-table tbody tr:nth-child(even) {
+        background: #f5f8fb;
+    }
+    .txd-table tbody tr:hover {
+        background: rgba(21, 128, 61, 0.07) !important;
+    }
+    .txd-table tbody td {
+        padding: 5px 10px;
+        color: #0f172a;
+        border-top: 0;
+        white-space: nowrap;
+    }
+    .txd-pill {
+        display: inline-flex;
+        align-items: center;
+        height: 20px;
+        padding: 0 8px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+    }
+    .txd-pill-info { background: rgba(14, 165, 233, 0.12); color: #0369a1; }
+    .txd-pill-warn { background: rgba(245, 158, 11, 0.14); color: #b45309; }
+    .txd-pill-ok   { background: rgba(21, 128, 61, 0.12); color: #15803d; }
+    .txd-pill-mute { background: #f1f5f9; color: #64748b; }
+    .txd-pill-bad  { background: rgba(220, 38, 38, 0.1); color: #b91c1c; }
+    .txd-foot {
+        border-top: 1px solid #f1f5f9;
+        padding: 8px 14px;
+        background: #ffffff;
+    }
+    .txd-btn {
+        height: 30px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid #dbe3ee;
+        background: #ffffff;
+        color: #334155;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .txd-btn:hover {
+        background: #f8fafc;
+    }
+</style>
+
+<script>
+    function getShiftSortKey(dateValue) {
+        var d = new Date(dateValue);
+        if (Number.isNaN(d.getTime())) return Number.MAX_SAFE_INTEGER;
+
+        var hour = d.getHours();
+        var minute = d.getMinutes();
+        var second = d.getSeconds();
+        var timeInSeconds = (hour * 3600) + (minute * 60) + second;
+
+        // Night shift display order: 22:00 -> 23:59 -> 00:00 -> 05:59
+        return hour < 6 ? timeInSeconds + (24 * 3600) : timeInSeconds;
+    }
+
+    function sortTransactionsForDisplay(logs) {
+        if (!Array.isArray(logs)) return [];
+        if (logs.length <= 1) return logs.slice();
+
+        var hasLateNight = logs.some(function (x) {
+            var d = new Date(x.eventTime);
+            return !Number.isNaN(d.getTime()) && d.getHours() >= 22;
+        });
+        var hasEarlyMorning = logs.some(function (x) {
+            var d = new Date(x.eventTime);
+            return !Number.isNaN(d.getTime()) && d.getHours() < 6;
+        });
+
+        var sorted = logs.slice();
+        if (hasLateNight && hasEarlyMorning) {
+            sorted.sort(function (a, b) {
+                return getShiftSortKey(a.eventTime) - getShiftSortKey(b.eventTime);
+            });
+            return sorted;
+        }
+
+        sorted.sort(function (a, b) {
+            return new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime();
+        });
+        return sorted;
+    }
+
+    function renderTransactionRows(logs, tableBodySelector) {
+        var ordered = sortTransactionsForDisplay(logs);
+        ordered.forEach(function (log) {
+            $(tableBodySelector).append(buildTransactionRow(log));
+        });
+    }
+
+    // Shared helper: builds a <tr> for a transaction log entry used by all details modals
+    function buildTransactionRow(log) {
+        var d = new Date(log.eventTime);
+        var pad = function(n) { return n.toString().padStart(2, '0'); };
+        var formattedTime = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + ' '
+                          + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+
+        var statusBadge = log.status === 'Normal'    ? 'txd-pill txd-pill-ok'
+                        : log.status === 'Exception' ? 'txd-pill txd-pill-bad'
+                        :                              'txd-pill txd-pill-mute';
+
+        var typeBadge = log.type === 'GATE IN'    ? 'txd-pill txd-pill-info'
+                      : log.type === 'GATE OUT'   ? 'txd-pill txd-pill-warn'
+                      : log.type === 'ATTENDANCE' ? 'txd-pill txd-pill-ok'
+                      : log.type === 'VERIFY'     ? 'txd-pill txd-pill-mute'
+                      :                             'txd-pill txd-pill-info';
+
+        return '<tr>'
+            + '<td>' + formattedTime + '</td>'
+            + '<td>' + (log.areaName || '-') + '</td>'
+            + '<td><span class="' + typeBadge   + '">' + (log.type   || 'Other') + '</span></td>'
+            + '<td>' + (log.devAlias        || '-') + '</td>'
+            + '<td>' + (log.eventPointName  || '-') + '</td>'
+            + '<td>' + (log.verifyModeDisplay || '-') + '</td>'
+            + '<td><span class="' + statusBadge + '">' + (log.status || '-') + '</span></td>'
+            + '</tr>';
+    }
+</script>

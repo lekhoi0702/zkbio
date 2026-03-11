@@ -1,0 +1,20 @@
+# Build outputs
+bin/
+obj/
+
+# User/IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Local tool/runtime folders
+.dotnet/
+.codex/
+.codex-build-temp/
+artifacts/
+
+# OS noise
+Thumbs.db
+Desktop.ini
+.DS_Store
