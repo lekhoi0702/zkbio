@@ -22,7 +22,7 @@ public static class CacheKeyHelper
     public static string ContractorAttendance(DateTime fromDate, DateTime toDate, string? pin) =>
         $"Contractor_Attendance_{fromDate:yyyyMMddHHmmss}_{toDate:yyyyMMddHHmmss}_{pin ?? ""}";
 
-    public static string EarlyExit(DateTime reportDate, int thresholdMinutes, string? factory, string? bu) =>
-        $"EarlyExit_{reportDate:yyyyMMdd}_{thresholdMinutes}_{factory}_{bu}";
+    public static string EarlyExit(DateTime reportDate, int thresholdMinutes, string? factory, string? bu, string? pin) =>
+        $"EarlyExit_{reportDate:yyyyMMdd}_{thresholdMinutes}_{factory}_{bu}_{pin ?? ""}";
 }
 

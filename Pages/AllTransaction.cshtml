@@ -164,7 +164,7 @@
                     <thead>
                         <tr>
                             <th>Time</th>
-                            <th>Factory</th>
+                            <th>AREA</th>
                             <th>Dept</th>
                             <th>PIN</th>
                             <th>Name</th>
@@ -174,92 +174,29 @@
                             <th>Verify</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @if (Model.Transactions != null)
-                        {
-                            foreach (var item in Model.Transactions)
-                            {
-                                <tr>
-                                    <td>@item.EventTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                                    <td>@item.AreaName</td>
-                                    <td>@item.DeptName</td>
-                                    <td>@item.Pin</td>
-                                    <td>@item.FullName</td>
-                                    <td>@item.DevAlias</td>
-                                    <td>@item.EventPointName</td>
-                                    <td>
-                                        @if (item.Status == "Normal")
-                                        {
-                                            <span class="at-badge at-badge-ok">Normal</span>
-                                        }
-                                        else if (item.Status == "Exception")
-                                        {
-                                            <span class="at-badge at-badge-err">Exception</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="at-badge at-badge-mute">@item.Status</span>
-                                        }
-                                    </td>
-                                    <td>@item.VerifyModeDisplay</td>
-                                </tr>
-                            }
-                        }
-                        else
+                    <tbody id="skeleton-loader">
+                        @for (int i = 0; i < 19; i++)
                         {
                             <tr>
-                                <td colspan="9" class="at-empty">No data found or connection error.</td>
+                                <td><div class="skeleton skeleton-text" style="width:130px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:70px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:120px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:70px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:150px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:120px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:160px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:80px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:90px"></div></td>
                             </tr>
                         }
                     </tbody>
+                    <tbody id="table-data"></tbody>
                 </table>
             </div>
             <div class="at-footer">
-                <ul class="at-pagination">
+                <ul class="at-pagination" id="atPagination">
                     <li style="display:flex;align-items:center;padding:0 8px;">
-                        <span class="at-footer-total">@Model.TotalCount.ToString("N0") records</span>
-                    </li>
-                    <li class="@(Model.PageNumber == 1 ? "disabled" : "")">
-                        <a asp-page="./AllTransaction"
-                           asp-route-PageNumber="@(Model.PageNumber - 1)"
-                           asp-route-Filter.FromDate="@Model.Filter.FromDate?.ToString("yyyy-MM-ddTHH:mm")"
-                           asp-route-Filter.ToDate="@Model.Filter.ToDate?.ToString("yyyy-MM-ddTHH:mm")"
-                           asp-route-Filter.AreaName="@Model.Filter.AreaName"
-                           asp-route-Filter.DeptName="@Model.Filter.DeptName"
-                           asp-route-Filter.Pin="@Model.Filter.Pin"
-                           asp-route-Filter.Name="@Model.Filter.Name"
-                           asp-route-Filter.DevAlias="@Model.Filter.DevAlias"
-                           asp-route-Filter.EventPoint="@Model.Filter.EventPoint"
-                           asp-route-Filter.Status="@Model.Filter.Status">&laquo;</a>
-                    </li>
-                    @for (int i = Math.Max(1, Model.PageNumber - 5); i <= Math.Min(Model.TotalPages, Model.PageNumber + 5); i++)
-                    {
-                        <li class="@(i == Model.PageNumber ? "active" : "")">
-                            <a asp-page="./AllTransaction"
-                               asp-route-PageNumber="@i"
-                               asp-route-Filter.FromDate="@Model.Filter.FromDate?.ToString("yyyy-MM-ddTHH:mm")"
-                               asp-route-Filter.ToDate="@Model.Filter.ToDate?.ToString("yyyy-MM-ddTHH:mm")"
-                               asp-route-Filter.AreaName="@Model.Filter.AreaName"
-                               asp-route-Filter.DeptName="@Model.Filter.DeptName"
-                               asp-route-Filter.Pin="@Model.Filter.Pin"
-                               asp-route-Filter.Name="@Model.Filter.Name"
-                               asp-route-Filter.DevAlias="@Model.Filter.DevAlias"
-                               asp-route-Filter.EventPoint="@Model.Filter.EventPoint"
-                               asp-route-Filter.Status="@Model.Filter.Status">@i</a>
-                        </li>
-                    }
-                    <li class="@(Model.PageNumber == Model.TotalPages ? "disabled" : "")">
-                        <a asp-page="./AllTransaction"
-                           asp-route-PageNumber="@(Model.PageNumber + 1)"
-                           asp-route-Filter.FromDate="@Model.Filter.FromDate?.ToString("yyyy-MM-ddTHH:mm")"
-                           asp-route-Filter.ToDate="@Model.Filter.ToDate?.ToString("yyyy-MM-ddTHH:mm")"
-                           asp-route-Filter.AreaName="@Model.Filter.AreaName"
-                           asp-route-Filter.DeptName="@Model.Filter.DeptName"
-                           asp-route-Filter.Pin="@Model.Filter.Pin"
-                           asp-route-Filter.Name="@Model.Filter.Name"
-                           asp-route-Filter.DevAlias="@Model.Filter.DevAlias"
-                           asp-route-Filter.EventPoint="@Model.Filter.EventPoint"
-                           asp-route-Filter.Status="@Model.Filter.Status">&raquo;</a>
+                        <span class="at-footer-total" id="atTotalCount">0 records</span>
                     </li>
                 </ul>
             </div>
@@ -281,6 +218,8 @@
                 formSelector: '#filterForm',
                 submitDelayMs: 80
             });
+
+            initAllTransactionsAjax();
         });
 
         function openExportModal(type) {
@@ -298,5 +237,124 @@
             $('#exportMenuDropdown').removeClass('open');
             $('#exportModal').modal('show');
         }
+
+        function initAllTransactionsAjax() {
+            if (window.__allTxAjaxInit) return;
+            window.__allTxAjaxInit = true;
+            var $form = $('#filterForm');
+            var $tbody = $('#table-data');
+            var $pagination = $('#atPagination');
+            var $total = $('#atTotalCount');
+
+            function setLoading(isLoading) {
+                if (isLoading) $('body').addClass('is-loading');
+                else $('body').removeClass('is-loading');
+            }
+
+            function formatDateTime(value) {
+                if (!value) return '-';
+                var d = new Date(value);
+                if (Number.isNaN(d.getTime())) return value;
+                var pad = function(n) { return n.toString().padStart(2, '0'); };
+                return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' +
+                       pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+            }
+
+            function renderRows(rows) {
+                if (!rows || rows.length === 0) {
+                    $tbody.html('<tr><td colspan="9" class="at-empty">No data found for the selected date.</td></tr>');
+                    return;
+                }
+                var html = rows.map(function(item) {
+                    var statusClass = item.status === 'Normal' ? 'at-badge at-badge-ok'
+                                     : item.status === 'Exception' ? 'at-badge at-badge-err'
+                                     : 'at-badge at-badge-mute';
+                    var statusText = item.status || '-';
+                    return '<tr>'
+                        + '<td>' + formatDateTime(item.eventTime) + '</td>'
+                        + '<td>' + (item.areaName || '-') + '</td>'
+                        + '<td>' + (item.deptName || '-') + '</td>'
+                        + '<td>' + (item.pin || '-') + '</td>'
+                        + '<td>' + (item.fullName || '-') + '</td>'
+                        + '<td>' + (item.devAlias || '-') + '</td>'
+                        + '<td>' + (item.eventPointName || '-') + '</td>'
+                        + '<td><span class="' + statusClass + '">' + statusText + '</span></td>'
+                        + '<td>' + (item.verifyModeDisplay || '-') + '</td>'
+                        + '</tr>';
+                }).join('');
+                $tbody.html(html);
+            }
+
+            function renderPagination(pageNumber, totalPages) {
+                var html = '';
+                var prevDisabled = pageNumber <= 1 ? 'disabled' : '';
+                var nextDisabled = pageNumber >= totalPages ? 'disabled' : '';
+                html += '<li class="' + prevDisabled + '"><a href="#" data-page="' + (pageNumber - 1) + '">&laquo;</a></li>';
+                var start = Math.max(1, pageNumber - 5);
+                var end = Math.min(totalPages, pageNumber + 5);
+                for (var i = start; i <= end; i++) {
+                    var active = i === pageNumber ? 'active' : '';
+                    html += '<li class="' + active + '"><a href="#" data-page="' + i + '">' + i + '</a></li>';
+                }
+                html += '<li class="' + nextDisabled + '"><a href="#" data-page="' + (pageNumber + 1) + '">&raquo;</a></li>';
+                $pagination.find('li').not(':first').remove();
+                $pagination.append(html);
+            }
+
+            function buildQuery(pageNumber) {
+                if (!$form.length) return new URLSearchParams(window.location.search);
+                var params = new URLSearchParams(new FormData($form[0]));
+                params.set('PageNumber', pageNumber || 1);
+                return params.toString();
+            }
+
+            function updateUrl(query) {
+                var newUrl = window.location.pathname + '?' + query;
+                window.history.replaceState({}, '', newUrl);
+            }
+
+            function fetchData(pageNumber) {
+                try {
+                    setLoading(true);
+                    var query = buildQuery(pageNumber);
+                    updateUrl(query);
+                    fetch('?handler=Data&' + query, { headers: { 'Accept': 'application/json' } })
+                        .then(function(r) { return r.json(); })
+                        .then(function(resp) {
+                            $total.text((resp.totalCount || 0).toLocaleString() + ' records');
+                            renderRows(resp.data || []);
+                            renderPagination(resp.pageNumber || 1, resp.totalPages || 0);
+                        })
+                        .catch(function() {
+                            $tbody.html('<tr><td colspan="9" class="at-empty">No data found or connection error.</td></tr>');
+                            $total.text('0 records');
+                            renderPagination(1, 0);
+                        })
+                        .finally(function() { setLoading(false); });
+                } catch (err) {
+                    setLoading(false);
+                }
+            }
+
+            $form.on('submit', function(e) {
+                e.preventDefault();
+                fetchData(1);
+            });
+
+            $pagination.on('click', 'a[data-page]', function(e) {
+                e.preventDefault();
+                var page = parseInt($(this).data('page'), 10);
+                if (!Number.isNaN(page) && page > 0) fetchData(page);
+            });
+
+            fetchData(parseInt(new URLSearchParams(window.location.search).get('PageNumber') || '1', 10));
+            setTimeout(function() { setLoading(false); }, 10000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof initAllTransactionsAjax === 'function') {
+                initAllTransactionsAjax();
+            }
+        });
     </script>
 }

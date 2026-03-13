@@ -4,54 +4,6 @@
     ViewData["Title"] = "Abnormal Transactions";
 }
 
-@section Scripts {
-    <script>
-        function viewDetails(pin, first, last, name) {
-            ZKBioUi.openTransactionDetails({
-                employeeHeader: name + ' (' + pin + ')',
-                dateHeader: '',
-                url: '?handler=Details',
-                requestData: { pin: pin, start: first, end: last },
-                noRecordsText: 'No records found.',
-                errorText: 'Error fetching details.'
-            });
-        }
-
-        $(function () {
-            ZKBioUi.initSelectAllCheckbox('#selectAllColumns', '.column-checkbox');
-
-            ZKBioUi.initTypeMultiSelect({
-                buttonSelector: '#typeDropdownBtn',
-                menuSelector: '#typeDropdownMenu',
-                checkboxSelector: '[name="SelectedTypes"]',
-                emptyText: '-- All --',
-                labelBuilder: function ($checkbox) {
-                    return $checkbox.next('label').text();
-                }
-            });
-
-            ZKBioUi.initSimpleDropdown('#btnExportToggle', '#exportMenuDropdown');
-        });
-
-        function openExportModal(type) {
-            $('#exportDate')   .val($('[name="ReportDate"]').val());
-            $('#exportFactory').val($('[name="Factory"]').val());
-            $('#exportBU')     .val($('[name="BU"]').val());
-            $('#exportPin')    .val($('[name="Pin"]').val());
-
-            $('#exportSelectedTypesContainer').empty();
-            $('[name="SelectedTypes"]:checked').each(function() {
-                $('<input type="hidden" name="selectedTypes">').val($(this).val()).appendTo('#exportSelectedTypesContainer');
-            });
-
-            $('#exportForm').attr('action', '/api/export/attendance/' + type);
-            $('#exportModalLabel').text('Export — ' + type.toUpperCase());
-            $('#exportMenuDropdown').removeClass('open');
-            $('#exportModal').modal('show');
-        }
-    </script>
-}
-
 <section class="content report-shell" style="padding:0; --at-filter-col-min: 150px;">
     <div class="container-fluid px-0 d-flex flex-column" style="height:calc(100vh - 57px); overflow:hidden; gap:0;">
 
@@ -61,7 +13,7 @@
 
         <div class="at-filter-card">
             <div class="at-filter-body">
-                <form method="get">
+                <form method="get" id="attendanceFilterForm">
                     <div class="at-filter-grid">
                         <div>
                             <label>Date</label>
@@ -217,7 +169,7 @@
                         </tr>
                     </thead>
                     <tbody id="skeleton-loader">
-                        @for (int i = 0; i < 18; i++)
+                        @for (int i = 0; i < 19; i++)
                         {
                             <tr>
                                 <td><div class="skeleton skeleton-text" style="width:80px"></div></td>
@@ -235,73 +187,13 @@
                             </tr>
                         }
                     </tbody>
-                    <tbody id="table-data">
-                        @if (Model.Records != null && Model.Records.Any())
-                        {
-                            foreach (var item in Model.Records)
-                            {
-                                <tr>
-                                    <td>@item.Factory</td>
-                                    <td>@item.BU</td>
-                                    <td>@item.DeptName</td>
-                                    <td>@item.Pin</td>
-                                    <td>@item.FullName</td>
-                                    <td>@ZkbioDashboard.Helpers.AttendanceFilterHelper.FormatEffectiveType(item)</td>
-                                    <td>@item.Date.ToString("yyyy-MM-dd")</td>
-                                    <td>@(item.GateIn?.ToString("HH:mm:ss") ?? "-")</td>
-                                    <td>@(item.AttendIn?.ToString("HH:mm:ss") ?? "-")</td>
-                                    <td>@(item.AttendOut?.ToString("HH:mm:ss") ?? "-")</td>
-                                    <td>@(item.GateOut?.ToString("HH:mm:ss") ?? "-")</td>
-                                    <td>
-                                        @if (item.FirstPunch.HasValue && item.LastPunch.HasValue)
-                                        {
-                                            <button type="button" class="at-btn-detail"
-                                                    onclick="viewDetails('@item.Pin', '@item.FirstPunch.Value.ToString("yyyy-MM-ddTHH:mm:ss")', '@item.LastPunch.Value.ToString("yyyy-MM-ddTHH:mm:ss")', '@item.FullName')">
-                                                Details
-                                            </button>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        }
-                        else
-                        {
-                            <tr><td colspan="12" class="at-empty">No data found for the selected date.</td></tr>
-                        }
-                    </tbody>
+                    <tbody id="table-data"></tbody>
                 </table>
             </div>
             <div class="at-footer">
-                <ul class="at-pagination">
+                <ul class="at-pagination" id="attPagination">
                     <li style="display:flex;align-items:center;padding:0 8px;">
-                        <span class="at-footer-total">@Model.TotalCount.ToString("N0") records</span>
-                    </li>
-                    @{
-                        var baseRoute = new Dictionary<string, string> {
-                            { "ReportDate", Model.ReportDate?.ToString("yyyy-MM-dd") ?? "" },
-                            { "Factory",   Model.Factory ?? "" },
-                            { "BU",        Model.BU ?? "" },
-                            { "Pin",       Model.Pin ?? "" }
-                        };
-                        for (int idx = 0; idx < Model.SelectedTypes.Count; idx++)
-                        {
-                            baseRoute[$"SelectedTypes[{idx}]"] = Model.SelectedTypes[idx];
-                        }
-                    }
-                    <li class="@(Model.PageNumber <= 1 ? "disabled" : "")">
-                        @{ var prevRoute = new Dictionary<string, string>(baseRoute); prevRoute["PageNumber"] = (Model.PageNumber - 1).ToString(); }
-                        <a asp-page="./AttendanceReport" asp-all-route-data="prevRoute">&laquo;</a>
-                    </li>
-                    @for (int i = Math.Max(1, Model.PageNumber - 5); i <= Math.Min(Model.TotalPages, Model.PageNumber + 5); i++)
-                    {
-                        <li class="@(i == Model.PageNumber ? "active" : "")">
-                            @{ var currRoute = new Dictionary<string, string>(baseRoute); currRoute["PageNumber"] = i.ToString(); }
-                            <a asp-page="./AttendanceReport" asp-all-route-data="currRoute">@i</a>
-                        </li>
-                    }
-                    <li class="@(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
-                        @{ var nextRoute = new Dictionary<string, string>(baseRoute); nextRoute["PageNumber"] = (Model.PageNumber + 1).ToString(); }
-                        <a asp-page="./AttendanceReport" asp-all-route-data="nextRoute">&raquo;</a>
+                        <span class="at-footer-total" id="attTotalCount">0 records</span>
                     </li>
                 </ul>
             </div>
@@ -311,4 +203,207 @@
 </section>
 
 @await Html.PartialAsync("_TransactionDetailsModal")
+
+@section Scripts {
+    <script>
+        function viewDetails(pin, first, last, name) {
+            if (!window.ZKBioUi) {
+                console.error("ZKBioUi not found");
+                return;
+            }
+            ZKBioUi.openTransactionDetails({
+                employeeHeader: name + ' (' + pin + ')',
+                dateHeader: '',
+                url: '?handler=Details',
+                requestData: { pin: pin, start: first, end: last },
+                noRecordsText: 'No records found.',
+                errorText: 'Error fetching details.'
+            });
+        }
+
+        $(function () {
+            console.log("Initializing Abnormal Transactions Page UI...");
+            
+            if (window.ZKBioUi) {
+                ZKBioUi.initSelectAllCheckbox('#selectAllColumns', '.column-checkbox');
+
+                ZKBioUi.initTypeMultiSelect({
+                    buttonSelector: '#typeDropdownBtn',
+                    menuSelector: '#typeDropdownMenu',
+                    checkboxSelector: '[name="SelectedTypes"]',
+                    emptyText: '-- All --',
+                    labelBuilder: function ($checkbox) {
+                        return $checkbox.next('label').text();
+                    }
+                });
+
+                ZKBioUi.initSimpleDropdown('#btnExportToggle', '#exportMenuDropdown');
+            } else {
+                console.warn("ZKBioUi script not found or not initialized yet.");
+            }
+
+            initAttendanceAjax();
+        });
+
+        function openExportModal(type) {
+            $('#exportDate')   .val($('[name="ReportDate"]').val());
+            $('#exportFactory').val($('[name="Factory"]').val());
+            $('#exportBU')     .val($('[name="BU"]').val());
+            $('#exportPin')    .val($('[name="Pin"]').val());
+
+            $('#exportSelectedTypesContainer').empty();
+            $('[name="SelectedTypes"]:checked').each(function() {
+                $('<input type="hidden" name="selectedTypes">').val($(this).val()).appendTo('#exportSelectedTypesContainer');
+            });
+
+            $('#exportForm').attr('action', '/api/export/attendance/' + type);
+            $('#exportModalLabel').text('Export — ' + type.toUpperCase());
+            $('#exportMenuDropdown').removeClass('open');
+            $('#exportModal').modal('show');
+        }
+
+        function initAttendanceAjax() {
+            if (window.__attAjaxInit) return;
+            window.__attAjaxInit = true;
+            
+            var $form = $('#attendanceFilterForm');
+            var $tbody = $('#table-data');
+            var $pagination = $('#attPagination');
+            var $total = $('#attTotalCount');
+
+            console.log("Initializing Attendance AJAX. Form found:", $form.length);
+
+            function setLoading(isLoading) {
+                if (isLoading) $('body').addClass('is-loading');
+                else $('body').removeClass('is-loading');
+            }
+
+            function renderRows(rows) {
+                if (!rows || rows.length === 0) {
+                    $tbody.html('<tr><td colspan="12" class="at-empty">No data found for the selected date.</td></tr>');
+                    return;
+                }
+                var html = rows.map(function(item) {
+                    var detailBtn = '';
+                    if (item.firstPunch && item.lastPunch) {
+                        detailBtn = '<button type="button" class="at-btn-detail"'
+                                  + ' onclick="viewDetails(\'' + item.pin + '\', \'' + item.firstPunch + '\', \'' + item.lastPunch + '\', \'' + item.fullName.replace(/'/g, "\\'") + '\')">Details</button>';
+                    }
+                    return '<tr>'
+                        + '<td>' + (item.factory || '-') + '</td>'
+                        + '<td>' + (item.bu || '-') + '</td>'
+                        + '<td>' + (item.deptName || '-') + '</td>'
+                        + '<td>' + (item.pin || '-') + '</td>'
+                        + '<td>' + (item.fullName || '-') + '</td>'
+                        + '<td>' + (item.type || '-') + '</td>'
+                        + '<td>' + (item.date || '-') + '</td>'
+                        + '<td>' + (item.gateIn || '-') + '</td>'
+                        + '<td>' + (item.attendIn || '-') + '</td>'
+                        + '<td>' + (item.attendOut || '-') + '</td>'
+                        + '<td>' + (item.gateOut || '-') + '</td>'
+                        + '<td>' + detailBtn + '</td>'
+                        + '</tr>';
+                }).join('');
+                $tbody.html(html);
+            }
+
+            function renderPagination(pageNumber, totalPages) {
+                var html = '';
+                var prevDisabled = pageNumber <= 1 ? 'disabled' : '';
+                var nextDisabled = pageNumber >= totalPages ? 'disabled' : '';
+                html += '<li class="' + prevDisabled + '"><a href="#" data-page="' + (pageNumber - 1) + '">&laquo;</a></li>';
+                
+                var start = Math.max(1, pageNumber - 5);
+                var end = Math.min(totalPages, pageNumber + 5);
+                for (var i = start; i <= end; i++) {
+                    var active = i === pageNumber ? 'active' : '';
+                    html += '<li class="' + active + '"><a href="#" data-page="' + i + '">' + i + '</a></li>';
+                }
+                html += '<li class="' + nextDisabled + '"><a href="#" data-page="' + (pageNumber + 1) + '">&raquo;</a></li>';
+                $pagination.find('li').not(':first').remove();
+                $pagination.append(html);
+            }
+
+            function buildQuery(pageNumber) {
+                if (!$form.length) return "PageNumber=" + (pageNumber || 1);
+                var params = new URLSearchParams(new FormData($form[0]));
+                params.set('PageNumber', pageNumber || 1);
+                return params.toString();
+            }
+
+            function updateUrl(query) {
+                if (!query) return;
+                var newUrl = window.location.pathname + '?' + query;
+                window.history.replaceState({}, '', newUrl);
+            }
+
+            function fetchData(pageNumber) {
+                console.log("Fetching data for page:", pageNumber);
+                try {
+                    setLoading(true);
+                    var query = buildQuery(pageNumber);
+                    updateUrl(query);
+                    
+                    fetch('?handler=Data&' + query, { headers: { 'Accept': 'application/json' } })
+                        .then(function(r) { 
+                            if (!r.ok) throw new Error("HTTP error " + r.status);
+                            return r.json(); 
+                        })
+                        .then(function(resp) {
+                            console.log("Data received:", resp);
+                            if (resp.error) {
+                                console.error("Server error:", resp.error);
+                            }
+                            $total.text((resp.totalCount || 0).toLocaleString() + ' records');
+                            renderRows(resp.data || []);
+                            renderPagination(resp.pageNumber || 1, resp.totalPages || 0);
+                        })
+                        .catch(function(err) {
+                            console.error("Fetch failed:", err);
+                            $tbody.html('<tr><td colspan="12" class="at-empty">Error loading data. Please try again.</td></tr>');
+                            $total.text('0 records');
+                            renderPagination(1, 0);
+                        })
+                        .finally(function() { 
+                            console.log("Fetch complete.");
+                            setLoading(false); 
+                        });
+                } catch (err) {
+                    console.error("fetchData error:", err);
+                    setLoading(false);
+                }
+            }
+
+            $form.on('submit', function(e) {
+                console.log("Form submitted via AJAX");
+                e.preventDefault();
+                fetchData(1);
+            });
+
+            $pagination.on('click', 'a[data-page]', function(e) {
+                e.preventDefault();
+                var page = parseInt($(this).data('page'), 10);
+                if (!Number.isNaN(page) && page > 0) fetchData(page);
+            });
+
+            // Initial fetch
+            var initialPage = parseInt(new URLSearchParams(window.location.search).get('PageNumber') || '1', 10);
+            fetchData(initialPage);
+
+            // Safety timeout to remove loading class if anything hangs
+            setTimeout(function() { 
+                if ($('body').hasClass('is-loading')) {
+                    console.warn("Safety timeout triggered: removing is-loading class.");
+                    setLoading(false); 
+                }
+            }, 10000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof initAttendanceAjax === 'function') {
+                initAttendanceAjax();
+            }
+        });
+    </script>
+}
 

@@ -49,6 +49,15 @@ public class AttendanceReportModel : PageModel
 
     public async Task OnGetAsync()
     {
+        ViewData["StartLoading"] = true;
+        Factories = AttendanceOptions.Factories.ToList();
+        BUs = AttendanceOptions.BUs.ToList();
+        Types = AttendanceOptions.Types.ToList();
+        ReportDate ??= DateTime.Today.AddDays(-1);
+    }
+
+    public async Task<JsonResult> OnGetDataAsync()
+    {
         Factories = AttendanceOptions.Factories.ToList();
         BUs = AttendanceOptions.BUs.ToList();
         Types = AttendanceOptions.Types.ToList();
@@ -62,14 +71,13 @@ public class AttendanceReportModel : PageModel
             {
                 var fetchedRecords = await _transactionService.GetAttendanceReportAsync(ReportDate.Value, Pin);
                 allRecords = fetchedRecords.ToList();
-                _cache.Set(rawCacheKey, allRecords, TimeSpan.FromMinutes(5));
+                _cache.Set(rawCacheKey, allRecords, TimeSpan.FromMinutes(30));
             }
 
             // Only care about records with at least one effective exception code
             var allExceptions = allRecords
                 .Where(r => AttendanceFilterHelper.ComputeEffectiveCodes(r).Any())
                 .ToList();
-            // Types are now static from AttendanceOptions.Types
 
             // Cache filtered list for pagination speed (2 mins)
             string filterKey = CacheKeyHelper.AttendanceFiltered(
@@ -78,27 +86,57 @@ public class AttendanceReportModel : PageModel
                 Factory,
                 BU,
                 SelectedTypes);
-            
+
             if (!_cache.TryGetValue(filterKey, out List<AttendanceRecord>? filteredList) || filteredList == null)
             {
                 filteredList = AttendanceFilterHelper
                     .ApplyFilters(allExceptions, Factory, BU, SelectedTypes)
                     .ToList();
-                _cache.Set(filterKey, filteredList, TimeSpan.FromMinutes(2));
+                _cache.Set(filterKey, filteredList, TimeSpan.FromMinutes(30));
             }
-            
+
             TotalCount = filteredList.Count;
 
-            // Apply Paging
-            Records = filteredList
+            var paged = filteredList
                 .Skip((PageNumber - 1) * PageSize)
                 .Take(PageSize)
                 .ToList();
+
+            var payload = new
+            {
+                data = paged.Select(item => new
+                {
+                    item.Factory,
+                    item.BU,
+                    item.DeptName,
+                    item.Pin,
+                    item.FullName,
+                    Type = AttendanceFilterHelper.FormatEffectiveType(item),
+                    Date = item.Date.ToString("yyyy-MM-dd"),
+                    GateIn = item.GateIn?.ToString("HH:mm:ss") ?? "-",
+                    AttendIn = item.AttendIn?.ToString("HH:mm:ss") ?? "-",
+                    AttendOut = item.AttendOut?.ToString("HH:mm:ss") ?? "-",
+                    GateOut = item.GateOut?.ToString("HH:mm:ss") ?? "-",
+                    FirstPunch = item.FirstPunch?.ToString("yyyy-MM-ddTHH:mm:ss"),
+                    LastPunch = item.LastPunch?.ToString("yyyy-MM-ddTHH:mm:ss")
+                }),
+                totalCount = TotalCount,
+                pageNumber = PageNumber,
+                totalPages = TotalPages
+            };
+
+            return new JsonResult(payload);
         }
         catch (Exception)
         {
-            Records = null;
-            TotalCount = 0;
+            return new JsonResult(new
+            {
+                data = Array.Empty<object>(),
+                totalCount = 0,
+                pageNumber = PageNumber,
+                totalPages = 0,
+                error = "Failed to load data."
+            });
         }
     }
 

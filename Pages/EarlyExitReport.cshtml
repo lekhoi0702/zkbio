@@ -9,6 +9,7 @@
     <input type="hidden" name="date"             id="exportDate" />
     <input type="hidden" name="factory"          id="exportFactory" />
     <input type="hidden" name="bu"               id="exportBU" />
+    <input type="hidden" name="pin"              id="exportPin" />
     <input type="hidden" name="thresholdMinutes" id="exportThreshold" />
 </form>
 
@@ -18,6 +19,7 @@
             $('#exportDate')     .val($('[name="ReportDate"]').val());
             $('#exportFactory')  .val($('[name="Factory"]').val());
             $('#exportBU')       .val($('[name="BU"]').val());
+            $('#exportPin')      .val($('[name="Pin"]').val());
             $('#exportThreshold').val($('[name="ThresholdMinutes"]').val());
             $('#exportForm').attr('action', '/api/export/earlyexit/' + type).submit();
         }
@@ -82,6 +84,10 @@
                         <div>
                             <label>Threshold (min)</label>
                             <input type="number" asp-for="ThresholdMinutes" class="form-control" min="1" max="60" />
+                        </div>
+                        <div>
+                            <label>PIN</label>
+                            <input type="text" asp-for="Pin" class="form-control" placeholder="Search PIN..." />
                         </div>
                         <div class="at-filter-actions">
                             <button type="submit" class="at-btn at-btn-primary" title="Apply">
@@ -171,7 +177,8 @@
                             { "ReportDate",       Model.ReportDate?.ToString("yyyy-MM-dd") ?? "" },
                             { "ThresholdMinutes", Model.ThresholdMinutes.ToString() },
                             { "Factory",          Model.Factory ?? "" },
-                            { "BU",               Model.BU ?? "" }
+                            { "BU",               Model.BU ?? "" },
+                            { "Pin",              Model.Pin ?? "" }
                         };
                     }
                     <li class="@(Model.PageNumber <= 1 ? "disabled" : "")">

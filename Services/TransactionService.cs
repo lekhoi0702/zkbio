@@ -29,7 +29,7 @@ public class TransactionService : ITransactionService
     private readonly IConfiguration _configuration;
     private readonly IMemoryCache _cache;
 
-    private static readonly TimeSpan AllTransactionsCacheDuration = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan AllTransactionsCacheDuration = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan DepartmentCacheDuration = TimeSpan.FromMinutes(30);
     private static readonly string[] ExcludedPinTokens = ["KH", "TT", "SU"];
 
@@ -565,8 +565,15 @@ public class TransactionService : ITransactionService
                 var n when n.Contains("BU1", StringComparison.OrdinalIgnoreCase) => "BU1",
                 var n when n.Contains("BU2", StringComparison.OrdinalIgnoreCase) => "BU2",
                 var n when n.Contains("BU3", StringComparison.OrdinalIgnoreCase) => "BU3",
+                var n when n.Contains("JSG", StringComparison.OrdinalIgnoreCase) => "JSG",
                 _ => "JIAHSIN"
             };
+        }
+        else if (root != null && factoryName.Equals("JSG", StringComparison.OrdinalIgnoreCase))
+        {
+            // JSG is a BU under JIAHSIN (peer of BU1/BU2/BU3)
+            factoryName = "JIAHSIN";
+            buName = "JSG";
         }
 
         return (factoryName, buName);

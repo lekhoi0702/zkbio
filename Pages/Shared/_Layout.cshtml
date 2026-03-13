@@ -18,22 +18,6 @@
   <!-- Flatpickr -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
-    /* ---- Top progress bar ---- */
-    #top-progress-bar {
-        position: fixed; top: 0; left: 0;
-        width: 0%; height: 3px;
-        background: linear-gradient(90deg, #15803d, #22c55e);
-        z-index: 9999;
-        transition: width 0.3s ease-in-out;
-        box-shadow: 0 0 16px rgba(21, 128, 61, 0.45);
-        pointer-events: none;
-    }
-    @@keyframes pulse-progress {
-        0%,100% { opacity: 0.6; }
-        50%      { opacity: 1; }
-    }
-    #top-progress-bar.loading { animation: pulse-progress 1.5s infinite ease-in-out; }
-
     /* ---- Content header ---- */
     .content-header h1 { font-size: 1.25rem; font-weight: 800; color: #0f172a; letter-spacing: -0.03em; }
 
@@ -54,8 +38,7 @@
   </style>
   @RenderSection("Styles", required: false)
 </head>
-<body class="hold-transition sidebar-mini sidebar-no-expand app-shell">
-<div id="top-progress-bar"></div>
+<body class="hold-transition sidebar-mini sidebar-no-expand app-shell@(ViewData["StartLoading"] as bool? == true ? " is-loading" : "")">
 <div class="wrapper">
 
   <!-- Navbar -->
@@ -132,13 +115,13 @@
           <li class="nav-item">
             <a href="/contractor-access-history" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/ContractorAttendance" ? "active" : "")">
               <i class="nav-icon fas fa-hard-hat"></i>
-              <p>Contractor Access History</p>
+              <p>Contractor Access</p>
             </a>
           </li>
           <li class="nav-item">
             <a href="/personnel-access-history" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/PersonalAttendance" ? "active" : "")">
               <i class="nav-icon fas fa-user-clock"></i>
-              <p>Personnel Access History</p>
+              <p>Personnel Access</p>
             </a>
           </li>
         </ul>
@@ -185,21 +168,12 @@
             });
         });
 
-        // Top progress bar on navigation
+        // Skeleton loading on navigation
         $('.nav-link, .brand-link, .page-link').on('click', function(e) {
             var href = $(this).attr('href');
             if (href && href !== '#' && !e.ctrlKey && !e.shiftKey && !e.metaKey && this.hostname === window.location.hostname) {
-                $('#top-progress-bar').addClass('loading').css('width', '50%');
-                setTimeout(function() { $('#top-progress-bar').css('width', '80%'); }, 500);
+                $('body').addClass('is-loading');
             }
-        });
-
-        $(window).on('load', function() {
-            $('#top-progress-bar').css('width', '100%');
-            setTimeout(function() {
-                $('#top-progress-bar').removeClass('loading').css('opacity', '0');
-                setTimeout(function() { $('#top-progress-bar').css('width', '0').css('opacity', '1'); }, 300);
-            }, 300);
         });
 
         // PIN auto-format: strip spaces and uppercase (shared across all pages)

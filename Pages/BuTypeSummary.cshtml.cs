@@ -41,7 +41,7 @@ public class BuTypeSummaryModel : PageModel
                 : allRecords.Where(r => AttendanceFilterHelper.IsFactoryMatch(r, Factory)).ToList();
 
             cachedRows = BuildSummaryRows(filtered);
-            _cache.Set(cacheKey, cachedRows, TimeSpan.FromMinutes(5));
+            _cache.Set(cacheKey, cachedRows, TimeSpan.FromMinutes(30));
         }
 
         Rows = cachedRows;
@@ -51,9 +51,21 @@ public class BuTypeSummaryModel : PageModel
     {
         var rows = new Dictionary<string, BuTypeSummaryRow>(StringComparer.OrdinalIgnoreCase);
 
+        var allowedJiahsinBus = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "BU1",
+            "BU2",
+            "BU3",
+            "JSG"
+        };
+
         foreach (var record in records)
         {
             if (string.IsNullOrEmpty(record.BU))
+                continue;
+            if (record.Factory != null &&
+                record.Factory.Equals("JIAHSIN", StringComparison.OrdinalIgnoreCase) &&
+                !allowedJiahsinBus.Contains(record.BU))
                 continue;
 
             if (!rows.TryGetValue(record.BU, out var row))

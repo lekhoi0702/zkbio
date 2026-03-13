@@ -23,6 +23,7 @@ public class EarlyExitReportModel : PageModel
     [BindProperty(SupportsGet = true)] public int       ThresholdMinutes   { get; set; } = 1;
     [BindProperty(SupportsGet = true)] public string?   Factory            { get; set; }
     [BindProperty(SupportsGet = true)] public string?   BU                 { get; set; }
+    [BindProperty(SupportsGet = true)] public string?   Pin                { get; set; }
 
     // ---- Results ----
     public IEnumerable<EarlyExitRecord> Records    { get; private set; } = [];
@@ -48,14 +49,15 @@ public class EarlyExitReportModel : PageModel
             ReportDate.Value,
             ThresholdMinutes,
             Factory,
-            BU);
+            BU,
+            Pin);
         
         if (!_cache.TryGetValue(cacheKey, out List<EarlyExitRecord>? allRecords) || allRecords == null)
         {
             var rawRecords = await _transactionService.GetEarlyExitReportAsync(
                 ReportDate.Value, ThresholdMinutes, Factory);
             allRecords = rawRecords.ToList();
-            _cache.Set(cacheKey, allRecords, TimeSpan.FromMinutes(5));
+            _cache.Set(cacheKey, allRecords, TimeSpan.FromMinutes(30));
         }
 
 
@@ -68,6 +70,14 @@ public class EarlyExitReportModel : PageModel
         {
             filtered = filtered
                 .Where(r => AttendanceFilterHelper.IsBUMatch(r.BU, r.FactoryCluster, Factory, BU))
+                .ToList();
+        }
+
+        if (!string.IsNullOrEmpty(Pin))
+        {
+            var pinFilter = Pin.Trim();
+            filtered = filtered
+                .Where(r => r.Pin != null && r.Pin.Contains(pinFilter, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 

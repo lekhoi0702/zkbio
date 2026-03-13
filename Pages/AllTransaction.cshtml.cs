@@ -31,6 +31,7 @@ public class AllTransactionModel : PageModel
 
     public async Task OnGetAsync()
     {
+        ViewData["StartLoading"] = true;
         Factories = FactoryOptions.ToList();
 
         if (PageNumber < 1) PageNumber = 1;
@@ -39,16 +40,42 @@ public class AllTransactionModel : PageModel
             Filter.FromDate = DateTime.Today.AddDays(-3);
         if (!Filter.ToDate.HasValue) 
             Filter.ToDate = DateTime.Today.AddDays(1).AddSeconds(-1);
+    }
+
+    public async Task<JsonResult> OnGetDataAsync()
+    {
+        Factories = FactoryOptions.ToList();
+
+        if (PageNumber < 1) PageNumber = 1;
+
+        if (!Filter.FromDate.HasValue)
+            Filter.FromDate = DateTime.Today.AddDays(-3);
+        if (!Filter.ToDate.HasValue)
+            Filter.ToDate = DateTime.Today.AddDays(1).AddSeconds(-1);
 
         try
         {
             var result = await _transactionService.GetTransactionsPagedAsync(PageNumber, PageSize, Filter);
-            Transactions = result.Data;
             TotalCount = result.TotalCount;
+            var payload = new
+            {
+                data = result.Data,
+                totalCount = TotalCount,
+                pageNumber = PageNumber,
+                totalPages = TotalPages
+            };
+            return new JsonResult(payload);
         }
         catch (Exception)
         {
-            Transactions = null;
+            return new JsonResult(new
+            {
+                data = Array.Empty<AccTransaction>(),
+                totalCount = 0,
+                pageNumber = PageNumber,
+                totalPages = 0,
+                error = "Failed to load data."
+            });
         }
     }
 }

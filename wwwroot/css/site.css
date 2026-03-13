@@ -1,5 +1,5 @@
 html {
-  font-size: 14px;
+  font-size: 15.2px;
   height: 100%;
   overflow: hidden;
 }
@@ -127,6 +127,7 @@ a:hover {
 
 .app-topbar .nav-link {
   color: var(--zk-slate-700) !important;
+  font-size: 15.2px;
 }
 
 .app-topbar .nav-link:hover {
@@ -135,6 +136,7 @@ a:hover {
 
 .app-user-greeting {
   font-weight: 700;
+  font-size: 15.2px;
 }
 
 .app-sidebar {
@@ -201,6 +203,16 @@ a:hover {
   display: none !important;
 }
 
+/* Fix: Specific width lock for the brand link on hover to prevent the logo 
+   from shifting to the center of a phantom 250px sidebar expansion. */
+.sidebar-mini.sidebar-collapse .main-sidebar:hover .app-brand-link {
+  width: 4.6rem !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  justify-content: center !important;
+}
+
+
 .sidebar-collapse .app-brand-link img {
   max-width: 100%;
   height: auto;
@@ -216,6 +228,7 @@ a:hover {
   border-radius: 0;
   color: rgba(226, 232, 240, 0.78);
   font-weight: 600;
+  font-size: 15.2px;
   min-height: 44px;
   display: flex;
   align-items: center;
@@ -233,6 +246,7 @@ a:hover {
 .app-sidebar .nav-sidebar>.nav-item>.nav-link p {
   margin: 0;
   line-height: 1.2;
+  font-size: 14px;
 }
 
 .app-sidebar .nav-sidebar>.nav-item>.nav-link:hover {
@@ -1732,6 +1746,7 @@ body.is-loading .pagination {
   opacity: 0.6;
 }
 
+
 @media (max-width: 992px) {
 
   .system-filter-summary,
@@ -1898,6 +1913,22 @@ body.login-page .login-brand-panel {
     linear-gradient(160deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.62)),
     linear-gradient(120deg, rgba(21, 128, 61, 0.25), rgba(14, 116, 144, 0.18));
   color: #f8fafc;
+}
+
+body.login-page .login-brand-badge {
+  position: absolute;
+  right: 28px;
+  bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.92;
+}
+
+body.login-page .login-brand-badge img {
+  height: 40px;
+  width: auto;
+  display: block;
 }
 
 body.login-page .login-brand-visual {
@@ -2195,6 +2226,20 @@ body.login-page .login-submit {
   box-shadow: 0 18px 30px rgba(21, 128, 61, 0.22);
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
+
+body.login-page .login-submit-with-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+body.login-page .login-submit-with-logo img {
+  height: 20px;
+  width: auto;
+  display: block;
+}
+
 
 body.login-page .login-submit:hover {
   transform: translateY(-1px);

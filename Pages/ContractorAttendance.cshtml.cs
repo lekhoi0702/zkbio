@@ -85,7 +85,7 @@ public class ContractorAttendanceModel : PageModel
                         return recordEnd >= from && recordStart <= to;
                     })
                     .ToList();
-                _cache.Set(cacheKey, allRecords, TimeSpan.FromMinutes(5));
+                _cache.Set(cacheKey, allRecords, TimeSpan.FromMinutes(30));
             }
             // Types are now static from AttendanceOptions.Types
 
