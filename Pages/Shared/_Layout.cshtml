@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -106,31 +106,37 @@
       <nav class="mt-2">
         <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
           <li class="nav-item">
-            <a asp-page="/AllTransaction" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/AllTransaction" ? "active" : "")">
+            <a href="/all-transactions" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/AllTransaction" ? "active" : "")">
               <i class="nav-icon fas fa-exchange-alt"></i>
               <p>All Transactions</p>
             </a>
           </li>
           <li class="nav-item">
-            <a asp-page="/AttendanceReport" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/AttendanceReport" ? "active" : "")">
+            <a href="/abnormal-transactions" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/AttendanceReport" ? "active" : "")">
               <i class="nav-icon fas fa-exclamation-triangle"></i>
               <p>Abnormal Transactions</p>
             </a>
           </li>
           <li class="nav-item">
-            <a asp-page="/EarlyExitReport" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/EarlyExitReport" ? "active" : "")">
+            <a href="/bu-type-summary" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/BuTypeSummary" ? "active" : "")">
+              <i class="nav-icon fas fa-chart-bar"></i>
+              <p>BU Type Summary</p>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="/early-exit" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/EarlyExitReport" ? "active" : "")">
               <i class="nav-icon fas fa-sign-out-alt"></i>
               <p>Early Exit</p>
             </a>
           </li>
           <li class="nav-item">
-            <a asp-page="/ContractorAttendance" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/ContractorAttendance" ? "active" : "")">
+            <a href="/contractor-access-history" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/ContractorAttendance" ? "active" : "")">
               <i class="nav-icon fas fa-hard-hat"></i>
               <p>Contractor Access History</p>
             </a>
           </li>
           <li class="nav-item">
-            <a asp-page="/PersonalAttendance" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/PersonalAttendance" ? "active" : "")">
+            <a href="/personnel-access-history" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/PersonalAttendance" ? "active" : "")">
               <i class="nav-icon fas fa-user-clock"></i>
               <p>Personnel Access History</p>
             </a>
@@ -153,6 +159,7 @@
 
 <!-- jQuery -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
 <!-- Bootstrap 4 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.1/js/bootstrap.bundle.min.js"></script>
 <!-- AdminLTE App -->
@@ -285,29 +292,10 @@
             });
         }
 
-        function syncSidebarBrandLogo() {
-            var collapsed = $('body').hasClass('sidebar-collapse');
-            if (collapsed) {
-                $('#sidebarLogoExpanded').hide();
-                $('#sidebarLogoCollapsed').show();
-            } else {
-                $('#sidebarLogoExpanded').show();
-                $('#sidebarLogoCollapsed').hide();
-            }
-        }
-
-        syncSidebarBrandLogo();
-        $(document).on('click', '[data-widget="pushmenu"]', function() {
-            setTimeout(syncSidebarBrandLogo, 20);
-            setTimeout(syncSidebarBrandLogo, 180);
-        });
-        $(window).on('resize', function() {
-            setTimeout(syncSidebarBrandLogo, 20);
-        });
-
         initSystemTableSort();
     });
 </script>
 @RenderSection("Scripts", required: false)
 </body>
 </html>
+

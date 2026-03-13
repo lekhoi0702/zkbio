@@ -228,10 +228,7 @@ public static class AttendanceHelper
         bool hasAnyPunch = gateIn != null || attendIn != null || gateOut != null || attendOut != null;
 
         if (!hasAnyPunch)
-        {
-            evaluations.Add("A");
             return evaluations;
-        }
 
         // B: Missing required punches (must have all 4: GateIn, AttendIn, AttendOut, GateOut)
         if (gateIn == null || attendIn == null || gateOut == null || attendOut == null)

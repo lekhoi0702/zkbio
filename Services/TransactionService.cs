@@ -21,7 +21,7 @@ public interface ITransactionService
     /// Returns employees whose first gate-out occurred within <paramref name="thresholdMinutes"/> of their Attend In.
     /// Used to detect "clocked-in-then-ran-to-parking" behaviour.
     /// </summary>
-    Task<IEnumerable<EarlyExitRecord>> GetEarlyExitReportAsync(DateTime date, int thresholdMinutes = 5, string? factory = null);
+    Task<IEnumerable<EarlyExitRecord>> GetEarlyExitReportAsync(DateTime date, int thresholdMinutes = 1, string? factory = null);
 }
 
 public class TransactionService : ITransactionService
@@ -117,19 +117,40 @@ public class TransactionService : ITransactionService
         var queryStart  = reportStart.AddHours(-12);
         var queryEnd    = reportStart.AddHours(36);
 
-        var allRecords = new List<AttendanceRecord>();
+        // ── Phase 1: collect raw data from every server ──────────────────────
+        // Employees can touch gate devices on one server and ATT devices on
+        // another. We must merge all transactions per PIN across servers before
+        // building attendance records; otherwise gate punches are silently lost.
+
+        // allTransactions: every raw transaction across all servers
+        var allTransactions = new List<dynamic>();
+
+        // perServerMeta: metadata keyed by the PIN's "home server" (the server
+        //   where the ATT/dept transaction was found for that PIN).
+        //   value = (deptDict, rootNames, deptMapByCode, deptMapByName, factoryCluster)
+        var pinServerMeta = new Dictionary<string, (
+            Dictionary<string, Department> DeptDict,
+            IEnumerable<string> RootNames,
+            Dictionary<string, string> DeptMapByCode,
+            Dictionary<string, string> DeptMapByName,
+            string FactoryCluster)>(StringComparer.OrdinalIgnoreCase);
+
+        // pinAllowedSet: PINs that have at least one transaction in an allowed dept
+        var pinAllowedSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var connStr in GetConnectionStrings())
         {
             using var connection = new SqlConnection(connStr);
 
             var departmentCache = await GetDepartmentCacheEntryAsync(connStr, connection);
-            var departments  = departmentCache.Departments;
-            var deptDict     = departmentCache.ById;
-            var serverIp     = DepartmentHelper.GetServerIp(connStr);
-            var factoryCluster = ResolveFactoryClusterByServerIp(serverIp);
-            var rootNames    = ServerConstants.GetAttendanceRootNames(serverIp);
-            var allowedDepts = DepartmentHelper.BuildAllowedDepartments(departments, rootNames);
+            var departments     = departmentCache.Departments;
+            var deptDict        = departmentCache.ById;
+            var serverIp        = DepartmentHelper.GetServerIp(connStr);
+            var factoryCluster  = ResolveFactoryClusterByServerIp(serverIp);
+            var rootNames       = ServerConstants.GetAttendanceRootNames(serverIp);
+            var allowedDepts    = DepartmentHelper.BuildAllowedDepartments(departments, rootNames);
+            var deptMapByCode   = departmentCache.ByCode;
+            var deptMapByName   = departmentCache.ByName;
 
             if (!allowedDepts.Any())
                 continue;
@@ -138,32 +159,53 @@ public class TransactionService : ITransactionService
             if (!transactions.Any())
                 continue;
 
-            var deptMapByCode = departmentCache.ByCode;
-            var deptMapByName = departmentCache.ByName;
+            // Accumulate all transactions (gate + attendance) for later cross-server merge
+            allTransactions.AddRange(transactions);
 
-            var records = transactions
-                .Select(t => new
+            // Identify PINs that belong to this server's allowed departments and
+            // record the server metadata for building their attendance records.
+            foreach (var t in transactions)
+            {
+                var pinVal = (string)t.PIN;
+                if (pinAllowedSet.Contains(pinVal))
+                    continue;   // already confirmed as valid from another server
+
+                var deptId = DepartmentHelper.ResolveDeptId(
+                    t.DeptCode != null ? (string)t.DeptCode : null,
+                    t.DeptName != null ? (string)t.DeptName : null,
+                    deptMapByCode, deptMapByName, departments);
+
+                if (deptId != null && allowedDepts.Contains(deptId))
                 {
-                    Trans  = t,
-                    DeptId = DepartmentHelper.ResolveDeptId(
-                        t.DeptCode != null ? (string)t.DeptCode : null,
-                        t.DeptName != null ? (string)t.DeptName : null,
-                        deptMapByCode, deptMapByName, departments)
-                })
-                .Where(x => x.DeptId != null && allowedDepts.Contains(x.DeptId!))
-                .GroupBy(x => (string)x.Trans.PIN)
-                .Select(g => BuildAttendanceRecord(
-                    g.Key, date.Date,
-                    g.OrderBy(x => (DateTime)x.Trans.EventTime).Select(x => x.Trans).ToList(),
-                    reportStart, reportEnd,
-                    deptDict, rootNames, deptMapByCode, deptMapByName, factoryCluster))
-                .Where(r => r != null && (string.IsNullOrEmpty(factory) || r!.Factory == factory))
-                .ToList();
-
-            allRecords.AddRange(records!);
+                    pinAllowedSet.Add(pinVal);
+                    if (!pinServerMeta.ContainsKey(pinVal))
+                        pinServerMeta[pinVal] = (deptDict, rootNames, deptMapByCode, deptMapByName, factoryCluster);
+                }
+            }
         }
 
-        return allRecords.OrderBy(r => r.DeptName).ThenBy(r => r.FullName);
+        // ── Phase 2: build one record per PIN from the merged dataset ─────────
+        var allRecords = allTransactions
+            .Where(t => pinAllowedSet.Contains((string)t.PIN))
+            .GroupBy(t => (string)t.PIN)
+            .Select(g =>
+            {
+                var pinVal = g.Key;
+                var meta   = pinServerMeta[pinVal];
+                return BuildAttendanceRecord(
+                    pinVal, date.Date,
+                    g.OrderBy(t => (DateTime)t.EventTime).ToList(),
+                    reportStart, reportEnd,
+                    meta.DeptDict, meta.RootNames,
+                    meta.DeptMapByCode, meta.DeptMapByName,
+                    meta.FactoryCluster);
+            })
+            .Where(r => r != null && (string.IsNullOrEmpty(factory) || r!.Factory == factory))
+            .ToList();
+
+        return allRecords
+            .Where(r => r != null)
+            .OrderBy(r => r!.DeptName).ThenBy(r => r!.FullName)!;
     }
 
     // -------------------------------------------------------------------------
@@ -297,7 +339,8 @@ public class TransactionService : ITransactionService
             var deptMapByCode = departmentCache.ByCode;
             var deptMapByName = departmentCache.ByName;
 
-            var records = transactions
+            // Step 1: find PINs that belong to allowed contractor departments.
+            var allowedPins = transactions
                 .Select(t => new
                 {
                     Trans  = t,
@@ -307,10 +350,16 @@ public class TransactionService : ITransactionService
                         deptMapByCode, deptMapByName, departments)
                 })
                 .Where(x => x.DeptId != null && allowedDepts.Contains(x.DeptId!))
-                .GroupBy(x => (string)x.Trans.PIN)
+                .Select(x => (string)x.Trans.PIN)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // Step 2: build records from ALL transactions for those PINs.
+            var records = transactions
+                .Where(t => allowedPins.Contains((string)t.PIN))
+                .GroupBy(t => (string)t.PIN)
                 .Select(g => BuildContractorRecord(
                     g.Key, date.Date,
-                    g.OrderBy(x => (DateTime)x.Trans.EventTime).Select(x => x.Trans).ToList(),
+                    g.OrderBy(t => (DateTime)t.EventTime).ToList(),
                     reportStart, reportEnd,
                     deptDict, rootNames, deptMapByCode, deptMapByName, factoryCluster))
                 .Where(r => r != null && (string.IsNullOrEmpty(factory) || r!.Factory == factory))
@@ -354,10 +403,12 @@ public class TransactionService : ITransactionService
                     ELSE CAST(verify_mode_no AS VARCHAR) 
                 END AS VerifyModeDisplay,
                 CASE 
-                    WHEN event_point_name LIKE '%GATE%' AND event_point_name LIKE '%IN%'  THEN 'GATE IN'
-                    WHEN event_point_name LIKE '%GATE%' AND event_point_name LIKE '%OUT%' THEN 'GATE OUT'
-                    WHEN event_point_name LIKE '%ATT%'                                    THEN 'ATTENDANCE'
-                    WHEN event_point_name LIKE '%ACS-FF%'                                 THEN 'VERIFY'
+                    WHEN event_point_name LIKE '%-OUT%' OR event_point_name LIKE '% OUT%' OR
+                         event_point_name LIKE '%OUT-%' OR event_point_name LIKE '%EXIT%' THEN 'GATE OUT'
+                    WHEN event_point_name LIKE '%-IN%' OR event_point_name LIKE '% IN%' OR
+                         event_point_name LIKE '%IN-%' OR event_point_name LIKE '%ENTRY%' THEN 'GATE IN'
+                    WHEN event_point_name LIKE '%ATT%'                                     THEN 'ATTENDANCE'
+                    WHEN event_point_name LIKE '%ACS-FF%'                                  THEN 'VERIFY'
                     ELSE 'Other'
                 END AS Type
             FROM acc_transaction
@@ -484,7 +535,7 @@ public class TransactionService : ITransactionService
 
     /// <summary>
     /// Resolves the Factory name and BU name from a department ID.
-    /// JSGS → JSG; JIAHSIN departments are further resolved to BU1/BU2/BU3.
+    /// JSGS is grouped under SHIMMER; JIAHSIN departments are further resolved to BU1/BU2/BU3.
     /// </summary>
     private static (string Factory, string BU) ResolveFactoryAndBU(
         string? deptId,
@@ -497,11 +548,10 @@ public class TransactionService : ITransactionService
         var root        = DepartmentHelper.GetRootDepartment(deptId, deptDict, rootNames);
         var factoryName = root?.Name ?? "";
 
-        // Normalize: both JSGS and JSG SHM are displayed as JSG in attendance reports
-        if (factoryName.Equals("JSGS",    StringComparison.OrdinalIgnoreCase) ||
-            factoryName.Equals("JSG SHM", StringComparison.OrdinalIgnoreCase))
+        // Normalize: JSGS is reported under SHIMMER
+        if (factoryName.Equals("JSGS", StringComparison.OrdinalIgnoreCase))
         {
-            factoryName = "JSG";
+            factoryName = "SHIMMER";
         }
 
         var buName = factoryName;
@@ -690,13 +740,13 @@ public class TransactionService : ITransactionService
     // -------------------------------------------------------------------------
 
     public async Task<IEnumerable<EarlyExitRecord>> GetEarlyExitReportAsync(
-        DateTime date, int thresholdMinutes = 5, string? factory = null)
+        DateTime date, int thresholdMinutes = 1, string? factory = null)
     {
-        // Use same report window as attendance report (04:00 → next 04:00)
-        var reportStart = date.Date.AddHours(4);
-        var reportEnd   = reportStart.AddDays(1);
+        // Report window: full day + night extension (22:00 selected day → 06:00 next day)
+        var reportStart = date.Date;
+        var reportEnd   = date.Date.AddDays(1).AddHours(6);
         var queryStart  = reportStart.AddHours(-12);
-        var queryEnd    = reportStart.AddHours(36);
+        var queryEnd    = reportEnd.AddHours(12);
 
         var allRecords = new List<EarlyExitRecord>();
 
@@ -741,26 +791,62 @@ public class TransactionService : ITransactionService
                 var allLogs = group.OrderBy(x => (DateTime)x.Trans.EventTime).Select(x => x.Trans).ToList();
 
                 // Only consider logs within today's report window
-                var dailyLogs = allLogs
+                var windowLogs = allLogs
                     .Where(t => (DateTime)t.EventTime >= reportStart && (DateTime)t.EventTime < reportEnd)
                     .ToList();
 
-                if (!dailyLogs.Any())
+                if (!windowLogs.Any())
                     continue;
 
-                var (acsLogs, attLogs) = AttendanceHelper.SeparateLogsByDevice(allLogs);
+                // Determine shift for this employee (day or night)
+                var shiftStartPunch = AttendanceHelper.FindShiftStartPunch(windowLogs, allLogs) ?? windowLogs.First();
+                var shiftStartTime  = (DateTime)shiftStartPunch.EventTime;
+                bool isJSGAR        = shiftStartPunch.DeptCode != null &&
+                                      ((string)shiftStartPunch.DeptCode).Contains("JSGAR", StringComparison.OrdinalIgnoreCase);
+                var shiftDefs       = AttendanceHelper.GetShiftDefinitions(shiftStartTime.Date, includeShift4: isJSGAR);
+                var stayMinutes     = allLogs.Count > 1
+                    ? ((DateTime)allLogs.Last().EventTime - shiftStartTime).TotalMinutes
+                    : 0;
+                var matchedShift    = AttendanceHelper.MatchShift(shiftStartTime, stayMinutes, shiftDefs);
 
-                // AttendIn = first ATT punch in the report window
-                var attendInLog = attLogs
-                    .Where(t => (DateTime)t.EventTime >= reportStart && (DateTime)t.EventTime < reportEnd)
-                    .MinBy(t => (DateTime)t.EventTime);
+                // Focus on logs during the matched shift window
+                var shiftEndTime = matchedShift.End;
+                var currentShiftLogs = allLogs
+                    .Where(t => (DateTime)t.EventTime >= shiftStartTime && (DateTime)t.EventTime <= shiftEndTime)
+                    .ToList();
+
+                var (acsLogs, attLogs) = AttendanceHelper.SeparateLogsByDevice(currentShiftLogs);
+                var (gateIn, gateOut) = AttendanceHelper.ExtractGatePunches(acsLogs);
+
+                var attendPunches = AttendanceHelper.ResolveAttendancePunches(attLogs, gateIn, gateOut, matchedShift);
+                dynamic? attendInLog = attendPunches.Item1;
+                dynamic? attendOutLog = attendPunches.Item2;
+
+                // For night shift, avoid treating a 06:00 punch as AttendIn
+                if (matchedShift.Name == "Ca 3")
+                {
+                    if (attendInLog != null &&
+                        (DateTime)attendInLog.EventTime >= matchedShift.End.AddMinutes(-30))
+                    {
+                        attendOutLog ??= attendInLog;
+                        attendInLog = null;
+                    }
+
+                    if (attendInLog == null)
+                    {
+                        var latestValidIn = matchedShift.End.AddMinutes(-30);
+                        attendInLog = attLogs
+                            .FirstOrDefault(t => (DateTime)t.EventTime >= matchedShift.Start &&
+                                                 (DateTime)t.EventTime < latestValidIn);
+                    }
+                }
 
                 if (attendInLog == null)
                     continue;
 
                 var attendInTime = (DateTime)attendInLog.EventTime;
 
-                // First gate-out = first ACS OUT after AttendIn
+                // First gate-out = first ACS OUT after AttendIn (within window)
                 var firstGateOut = AttendanceHelper.FindFirstGateOut(acsLogs, attendInTime);
                 if (firstGateOut == null)
                     continue;
@@ -769,7 +855,7 @@ public class TransactionService : ITransactionService
                 if (gapMinutes > thresholdMinutes)
                     continue;
 
-                var infoPunch = dailyLogs.First();
+                var infoPunch = windowLogs.First();
                 var deptId    = DepartmentHelper.ResolveDeptId(
                     infoPunch.DeptCode != null ? (string)infoPunch.DeptCode : null,
                     infoPunch.DeptName != null ? (string)infoPunch.DeptName : null,
@@ -783,16 +869,6 @@ public class TransactionService : ITransactionService
 
                 if (!isFactoryMatch)
                     continue;
-
-                // Determine the shift the employee was working
-                var shiftStartPunch = AttendanceHelper.FindShiftStartPunch(dailyLogs, allLogs) ?? dailyLogs.First();
-                var shiftStartTime  = (DateTime)shiftStartPunch.EventTime;
-                bool isJSGAR        = shiftStartPunch.DeptCode != null &&
-                                      ((string)shiftStartPunch.DeptCode).Contains("JSGAR", StringComparison.OrdinalIgnoreCase);
-                var shiftDefs       = AttendanceHelper.GetShiftDefinitions(shiftStartTime.Date, includeShift4: isJSGAR);
-                var matchedShift    = AttendanceHelper.MatchShift(shiftStartTime,
-                    (allLogs.Count > 1 ? ((DateTime)allLogs.Last().EventTime - shiftStartTime).TotalMinutes : 0),
-                    shiftDefs);
 
                 allRecords.Add(new EarlyExitRecord
                 {
@@ -812,4 +888,5 @@ public class TransactionService : ITransactionService
         return allRecords.OrderBy(r => r.Factory).ThenBy(r => r.DeptName).ThenBy(r => r.FullName);
     }
 }
+
 

@@ -11,25 +11,26 @@ public static class ServerConstants
 
     /// <summary>
     /// Root department names for the Exception Times (Attendance) report.
-    /// JSG SHM is included here and consolidated into JSG.
+    /// For 3.45, only SHIMMER is included.
     /// </summary>
     public static string[] GetAttendanceRootNames(string serverIp) => serverIp switch
     {
         var ip when ip.Contains(Server045IpPattern) => ["JIAHSIN", "PD1", "JSG"],
-        var ip when ip.Contains(Server345IpPattern) => ["SHIMMER", "JSGS", "JSG SHM"],
+        var ip when ip.Contains(Server345IpPattern) => ["SHIMMER"],
         var ip when ip.Contains(Server046IpPattern) => ["JT1", "JT2"],
         _ => []
     };
 
     /// <summary>
     /// Root department names for Personal and Contractor attendance reports.
-    /// JSG SHM is NOT included — it remains a distinct unit here.
+    /// For 3.45, only SHIMMER is included.
     /// </summary>
     public static string[] GetPersonalRootNames(string serverIp) => serverIp switch
     {
         var ip when ip.Contains(Server045IpPattern) => ["JIAHSIN", "PD1", "JSG"],
-        var ip when ip.Contains(Server345IpPattern) => ["SHIMMER", "JSGS"],
+        var ip when ip.Contains(Server345IpPattern) => ["SHIMMER"],
         var ip when ip.Contains(Server046IpPattern) => ["JT1", "JT2"],
         _ => []
     };
 }
+

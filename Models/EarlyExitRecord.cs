@@ -11,6 +11,7 @@ public class EarlyExitRecord
     public string FullName    { get; set; } = "";
     public string DeptName    { get; set; } = "";
     public string Factory     { get; set; } = "";
+    public string FactoryCluster { get; set; } = "";
     public string BU          { get; set; } = "";
     public DateTime Date      { get; set; }
     public string  Shift      { get; set; } = "";
@@ -26,3 +27,4 @@ public class EarlyExitRecord
         ? (FirstGateOut.Value - AttendIn.Value).TotalMinutes
         : null;
 }
+

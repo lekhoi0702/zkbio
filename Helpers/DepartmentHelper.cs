@@ -55,13 +55,12 @@ public static class DepartmentHelper
 
     /// <summary>
     /// Finds department(s) matching the given root name (by code or name).
-    /// JSG, JSGS, and JSG SHM are matched by code only to avoid ambiguity.
+    /// JSG and JSGS are matched by code only to avoid ambiguity.
     /// </summary>
     public static List<Department> FindRootDepartments(List<Department> departments, string rootName)
     {
         bool codeOnlyMatch = rootName.Equals("JSG", StringComparison.OrdinalIgnoreCase)
-                          || rootName.Equals("JSGS", StringComparison.OrdinalIgnoreCase)
-                          || rootName.Equals("JSG SHM", StringComparison.OrdinalIgnoreCase);
+                          || rootName.Equals("JSGS", StringComparison.OrdinalIgnoreCase);
 
         return departments.Where(d =>
         {

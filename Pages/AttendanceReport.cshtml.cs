@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using ZkbioDashboard.Helpers;
 using ZkbioDashboard.Models;
 using ZkbioDashboard.Services;
 using Microsoft.Extensions.Caching.Memory;
@@ -10,8 +11,6 @@ public class AttendanceReportModel : PageModel
 {
     private readonly ITransactionService _transactionService;
     private readonly IMemoryCache _cache;
-    private static readonly List<string> FactoryOptions = ["JIAHSIN", "JSG", "JT1", "JT2", "PD1", "SHIMMER"];
-    private static readonly List<string> BUOptions = ["JSG", "BU1", "BU2", "BU3", "PD1", "SHIMMER", "JT1", "JT2"];
 
     public AttendanceReportModel(ITransactionService transactionService, IMemoryCache cache)
     {
@@ -50,20 +49,15 @@ public class AttendanceReportModel : PageModel
 
     public async Task OnGetAsync()
     {
-        Factories = FactoryOptions.ToList();
-        BUs = BUOptions.ToList();
-        Types = new List<string>();
-
-        // Default to yesterday if not specified
-        if (!ReportDate.HasValue)
-        {
-            ReportDate = DateTime.Today.AddDays(-1);
-        }
+        Factories = AttendanceOptions.Factories.ToList();
+        BUs = AttendanceOptions.BUs.ToList();
+        Types = AttendanceOptions.Types.ToList();
+        ReportDate ??= DateTime.Today.AddDays(-1);
 
         try
         {
             // Cache heavy DB fetch (raw data for the day) for 5 minutes
-            string rawCacheKey = $"Attendance_Raw_{ReportDate.Value:yyyyMMdd}_{Pin}";
+            string rawCacheKey = CacheKeyHelper.AttendanceRaw(ReportDate.Value, Pin);
             if (!_cache.TryGetValue(rawCacheKey, out List<AttendanceRecord>? allRecords) || allRecords == null)
             {
                 var fetchedRecords = await _transactionService.GetAttendanceReportAsync(ReportDate.Value, Pin);
@@ -71,39 +65,25 @@ public class AttendanceReportModel : PageModel
                 _cache.Set(rawCacheKey, allRecords, TimeSpan.FromMinutes(5));
             }
 
-            // Only care about records with exceptions/errors for this page
-            var allExceptions = allRecords.Where(r => !string.IsNullOrEmpty(r.Evaluation)).ToList();
-            
-            Types = allRecords
-                .Select(r => r.Evaluation)
-                .Where(t => !string.IsNullOrEmpty(t))
-                .SelectMany(t => t.Split(new[] { ',', '[', ']' }, StringSplitOptions.RemoveEmptyEntries))
-                .Select(t => t.Trim())
-                .Distinct()
-                .OrderBy(t => t)
+            // Only care about records with at least one effective exception code
+            var allExceptions = allRecords
+                .Where(r => AttendanceFilterHelper.ComputeEffectiveCodes(r).Any())
                 .ToList();
+            // Types are now static from AttendanceOptions.Types
 
             // Cache filtered list for pagination speed (2 mins)
-            string typesStr = SelectedTypes != null ? string.Join("-", SelectedTypes) : "";
-            string filterKey = $"Attendance_Filtered_{ReportDate.Value:yyyyMMdd}_{Pin}_{Factory}_{BU}_{typesStr}";
+            string filterKey = CacheKeyHelper.AttendanceFiltered(
+                ReportDate.Value,
+                Pin,
+                Factory,
+                BU,
+                SelectedTypes);
             
             if (!_cache.TryGetValue(filterKey, out List<AttendanceRecord>? filteredList) || filteredList == null)
             {
-                var filtered = allExceptions.AsEnumerable();
-                
-                if (!string.IsNullOrEmpty(Factory))
-                {
-                    filtered = filtered.Where(r => IsFactoryMatch(r, Factory));
-                }
-                if (!string.IsNullOrEmpty(BU))
-                    filtered = filtered.Where(r => IsBUMatch(r, Factory, BU));
-                if (SelectedTypes != null && SelectedTypes.Any())
-                {
-                    filtered = filtered.Where(r => r.Evaluation.Split(new[] { ',', '[', ']' }, StringSplitOptions.RemoveEmptyEntries)
-                                    .Select(s => s.Trim())
-                                    .Any(code => SelectedTypes.Contains(code)));
-                }
-                filteredList = filtered.ToList();
+                filteredList = AttendanceFilterHelper
+                    .ApplyFilters(allExceptions, Factory, BU, SelectedTypes)
+                    .ToList();
                 _cache.Set(filterKey, filteredList, TimeSpan.FromMinutes(2));
             }
             
@@ -122,29 +102,6 @@ public class AttendanceReportModel : PageModel
         }
     }
 
-    private static bool IsFactoryMatch(AttendanceRecord record, string selectedFactory)
-    {
-        return selectedFactory switch
-        {
-            "JIAHSIN" => record.Factory == "JIAHSIN" ||
-                         (record.Factory == "JSG" && record.FactoryCluster == "JIAHSIN"),
-            "SHIMMER" => record.Factory == "SHIMMER" ||
-                         (record.Factory == "JSG" && record.FactoryCluster == "SHIMMER"),
-            _ => record.Factory == selectedFactory
-        };
-    }
-
-    private static bool IsBUMatch(AttendanceRecord record, string? selectedFactory, string selectedBU)
-    {
-        if (selectedBU == "JSG" && selectedFactory == "JIAHSIN")
-            return record.BU == "JSG" && record.FactoryCluster == "JIAHSIN";
-
-        if (selectedBU == "JSG" && selectedFactory == "SHIMMER")
-            return record.BU == "JSG" && record.FactoryCluster == "SHIMMER";
-
-        return record.BU == selectedBU;
-    }
-
     public async Task<JsonResult> OnGetDetailsAsync(string pin, string start, string end)
     {
         if (DateTime.TryParse(start, out var startTime) && DateTime.TryParse(end, out var endTime))
@@ -157,14 +114,7 @@ public class AttendanceReportModel : PageModel
 
     public string GetTypeLabel(string type)
     {
-        return type switch
-        {
-            "B" => "[B] Missing the required 2+2 clock-in/clock-out records",
-            "C1" => "[C1] Gate Entry 30 Minutes Early",
-            "C2" => "[C2] Gate Exit > 30 minutes after Attend Out",
-            "D1" => "[D1] Late Arrival",
-            "D2" => "[D2] Early Departure",
-            _ => type
-        };
+        return AttendanceFilterHelper.GetTypeLabel(type);
     }
 }
+

@@ -1,137 +1,36 @@
-@page
+@page "/abnormal-transactions"
 @model ZkbioDashboard.Pages.AttendanceReportModel
 @{
     ViewData["Title"] = "Abnormal Transactions";
 }
 
-<style>
-    .at-page-header { margin: 8px 20px 4px; }
-    .at-page-header h1 { margin: 0; font-size: 0.95rem; font-weight: 700; letter-spacing: -0.01em; color: #0f172a; }
-
-    .at-filter-card { margin: 0 20px 8px; background: #fff; border-radius: 16px; position: relative; }
-    .at-filter-body { padding: 10px 14px; }
-    .at-filter-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 8px;
-        align-items: end;
-    }
-    .at-filter-grid label { display: block; font-size: 0.72rem; font-weight: 700; color: #64748b; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
-    .at-filter-grid .form-control { height: 34px; font-size: 0.8rem; border-radius: 10px; border: 1px solid #dbe3ee; padding: 0 10px; }
-    .at-filter-actions { display: flex; gap: 6px; align-items: flex-end; }
-    .at-btn { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 0.8rem; font-weight: 700; border: none; cursor: pointer; gap: 6px; transition: opacity 0.15s; text-decoration: none; }
-    .at-btn:hover { opacity: 0.88; text-decoration: none; }
-    .at-btn-primary   { background: linear-gradient(135deg, #15803d, #22c55e); color: #fff; }
-    .at-btn-ghost     { background: #f1f5f9; color: #334155; border: 1px solid #dbe3ee; }
-    .at-btn-secondary { background: #fff; color: #334155; border: 1px solid #dbe3ee; }
-
-    /* Type dropdown */
-    .at-type-dropdown { position: relative; }
-    .at-type-btn { width: 100%; height: 34px; font-size: 0.8rem; border-radius: 10px; border: 1px solid #dbe3ee; background: #fff; padding: 0 10px; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .at-type-menu { display: none; position: absolute; top: 100%; left: 0; z-index: 200; background: #fff; border: 1px solid #dbe3ee; border-radius: 12px; padding: 8px; min-width: 240px; max-height: 260px; overflow-y: auto; box-shadow: 0 8px 24px rgba(15,23,42,0.12); }
-    .at-type-menu.open { display: block; }
-
-    /* Export wrap */
-    .at-export-wrap { position: relative; }
-    .at-export-menu { display: none; position: absolute; top: calc(100% + 4px); right: 0; z-index: 200; background: #fff; border: 1px solid #dbe3ee; border-radius: 12px; padding: 6px; min-width: 160px; box-shadow: 0 8px 24px rgba(15,23,42,0.12); }
-    .at-export-menu.open { display: block; }
-    .at-export-menu a { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 0.8rem; color: #0f172a; text-decoration: none; }
-    .at-export-menu a:hover { background: #f8fafc; }
-
-    .at-legend { padding: 6px 14px 8px; font-size: 0.72rem; color: #64748b; border-top: 1px solid #f1f5f9; display: flex; flex-wrap: wrap; gap: 12px; }
-    .at-legend b { color: #334155; }
-
-    /* Table */
-    .at-table-card { margin: 0 20px 0; background: #fff; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; }
-    .at-table-scroll { overflow-y: auto; flex: 1 1 0; }
-    .at-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    .at-table thead th { position: sticky; top: 0; background: #f8fafc; font-size: 0.72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; padding: 7px 10px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-    .at-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.12s; }
-    .at-table tbody tr:nth-child(odd)  { background: #ffffff; }
-    .at-table tbody tr:nth-child(even) { background: #f5f8fb; }
-    .at-table tbody tr:hover           { background: rgba(21,128,61,0.07) !important; }
-    .at-table tbody td { padding: 5px 10px; color: #0f172a; font-size: 0.8rem; white-space: nowrap; }
-
-    .at-btn-detail { height: 24px; padding: 0 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #f1f5f9; color: #334155; border: 1px solid #dbe3ee; cursor: pointer; }
-    .at-btn-detail:hover { background: rgba(21,128,61,0.1); border-color: #15803d; color: #15803d; }
-
-    /* Footer / Pagination */
-    .at-footer { flex-shrink: 0; padding: 6px 14px; border-top: 1px solid #f1f5f9; display: flex; align-items: center; }
-    .at-pagination { display: flex; align-items: center; list-style: none; margin: 0; padding: 0; gap: 3px; }
-    .at-pagination li a { display: flex; align-items: center; justify-content: center; height: 28px; min-width: 28px; padding: 0 6px; border-radius: 7px; font-size: 0.78rem; color: #334155; text-decoration: none; border: 1px solid #e2e8f0; background: #fff; transition: background 0.12s; }
-    .at-pagination li a:hover { background: #f1f5f9; }
-    .at-pagination li.active a { background: #15803d; color: #fff; border-color: #15803d; }
-    .at-pagination li.disabled a { color: #cbd5e1; pointer-events: none; }
-    .at-footer-total { font-size: 0.78rem; color: #64748b; font-weight: 600; }
-    .at-empty { text-align: center; padding: 32px 16px; color: #94a3b8; font-size: 0.85rem; }
-</style>
-
 @section Scripts {
     <script>
         function viewDetails(pin, first, last, name) {
-            $('#modalEmployeeHeader').text(name + ' (' + pin + ')');
-            $('#modalDateHeader').text('');
-            $('#detailsTableBody').empty();
-            $('#detailsTable').hide();
-            $('#loadingIndicator').show();
-            $('#detailsModal').modal('show');
-
-            $.ajax({
+            ZKBioUi.openTransactionDetails({
+                employeeHeader: name + ' (' + pin + ')',
+                dateHeader: '',
                 url: '?handler=Details',
-                type: 'GET',
-                data: { pin: pin, start: first, end: last },
-                success: function (data) {
-                    $('#loadingIndicator').hide();
-                    if (data && data.length > 0) {
-                        renderTransactionRows(data, '#detailsTableBody');
-                        $('#detailsTable').show();
-                    } else {
-                        $('#detailsTableBody').append('<tr><td colspan="7" class="text-center">No records found.</td></tr>');
-                        $('#detailsTable').show();
-                    }
-                },
-                error: function () {
-                    $('#loadingIndicator').hide();
-                    alert('Error fetching details.');
-                }
+                requestData: { pin: pin, start: first, end: last },
+                noRecordsText: 'No records found.',
+                errorText: 'Error fetching details.'
             });
         }
 
         $(function () {
-            // Select All for export columns
-            $('#selectAllColumns').on('change', function() {
-                $('.column-checkbox').prop('checked', this.checked);
-            });
-            $('.column-checkbox').on('change', function() {
-                var allChecked = $('.column-checkbox:checked').length === $('.column-checkbox').length;
-                $('#selectAllColumns').prop('checked', this.checked ? allChecked : false);
+            ZKBioUi.initSelectAllCheckbox('#selectAllColumns', '.column-checkbox');
+
+            ZKBioUi.initTypeMultiSelect({
+                buttonSelector: '#typeDropdownBtn',
+                menuSelector: '#typeDropdownMenu',
+                checkboxSelector: '[name="SelectedTypes"]',
+                emptyText: '-- All --',
+                labelBuilder: function ($checkbox) {
+                    return $checkbox.next('label').text();
+                }
             });
 
-            // Type dropdown
-            $('#typeDropdownBtn').on('click', function(e) {
-                e.stopPropagation();
-                $('#typeDropdownMenu').toggleClass('open');
-            });
-            $('#typeDropdownMenu').on('click', function(e) {
-                e.stopPropagation();
-            });
-            $(document).on('click', function() {
-                $('#typeDropdownMenu').removeClass('open');
-                $('#exportMenuDropdown').removeClass('open');
-            });
-            function syncTypeLabel() {
-                var selected = [];
-                $('[name="SelectedTypes"]:checked').each(function() { selected.push($(this).next('label').text()); });
-                $('#typeDropdownBtn').text(selected.length > 0 ? selected.join(', ') : '-- All --');
-            }
-            $('[name="SelectedTypes"]').on('change', syncTypeLabel);
-            $('[name="SelectedTypes"]').first().trigger('change');
-
-            // Export dropdown
-            $('#btnExportToggle').on('click', function(e) {
-                e.stopPropagation();
-                $('#exportMenuDropdown').toggleClass('open');
-            });
+            ZKBioUi.initSimpleDropdown('#btnExportToggle', '#exportMenuDropdown');
         });
 
         function openExportModal(type) {
@@ -153,7 +52,7 @@
     </script>
 }
 
-<section class="content" style="padding:0;">
+<section class="content report-shell" style="padding:0; --at-filter-col-min: 150px;">
     <div class="container-fluid px-0 d-flex flex-column" style="height:calc(100vh - 57px); overflow:hidden; gap:0;">
 
         <div class="at-page-header">
@@ -169,7 +68,7 @@
                             <input type="date" asp-for="ReportDate" class="form-control" />
                         </div>
                         <div>
-                            <label>Area</label>
+                        <label>Factory</label>
                             <select asp-for="Factory" class="form-control">
                                 <option value="">-- All --</option>
                                 @foreach (var factory in Model.Factories)
@@ -318,7 +217,7 @@
                         </tr>
                     </thead>
                     <tbody id="skeleton-loader">
-                        @for (int i = 0; i < 10; i++)
+                        @for (int i = 0; i < 18; i++)
                         {
                             <tr>
                                 <td><div class="skeleton skeleton-text" style="width:80px"></div></td>
@@ -347,7 +246,7 @@
                                     <td>@item.DeptName</td>
                                     <td>@item.Pin</td>
                                     <td>@item.FullName</td>
-                                    <td>@item.Evaluation</td>
+                                    <td>@ZkbioDashboard.Helpers.AttendanceFilterHelper.FormatEffectiveType(item)</td>
                                     <td>@item.Date.ToString("yyyy-MM-dd")</td>
                                     <td>@(item.GateIn?.ToString("HH:mm:ss") ?? "-")</td>
                                     <td>@(item.AttendIn?.ToString("HH:mm:ss") ?? "-")</td>
@@ -412,3 +311,4 @@
 </section>
 
 @await Html.PartialAsync("_TransactionDetailsModal")
+

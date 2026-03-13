@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using ZkbioDashboard.Helpers;
 using ZkbioDashboard.Models;
 using ZkbioDashboard.Services;
 using Microsoft.Extensions.Caching.Memory;
@@ -20,7 +21,10 @@ public class ContractorAttendanceModel : PageModel
     public IEnumerable<AttendanceRecord>? Records { get; set; }
 
     [BindProperty(SupportsGet = true)]
-    public DateTime? ReportDate { get; set; }
+    public DateTime? FromDate { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public DateTime? ToDate { get; set; }
 
     [BindProperty(SupportsGet = true)]
     public string? Pin { get; set; }
@@ -40,53 +44,57 @@ public class ContractorAttendanceModel : PageModel
 
     public async Task OnGetAsync()
     {
-        if (!ReportDate.HasValue) ReportDate = DateTime.Today.AddDays(-1);
+        Factories = AttendanceOptions.Factories.ToList();
+        BUs = AttendanceOptions.BUs.ToList();
+        Types = AttendanceOptions.Types.ToList();
+        FromDate ??= DateTime.Today.AddDays(-1);
+        ToDate ??= DateTime.Today.AddDays(1).AddSeconds(-1);
+
+        if (FromDate > ToDate)
+        {
+            var temp = FromDate;
+            FromDate = ToDate;
+            ToDate = temp;
+        }
 
         try
         {
-            string cacheKey = $"Contractor_Attendance_{ReportDate.Value:yyyyMMdd}_{Pin}";
+            string cacheKey = CacheKeyHelper.ContractorAttendance(
+                FromDate!.Value,
+                ToDate!.Value,
+                Pin);
             if (!_cache.TryGetValue(cacheKey, out List<AttendanceRecord>? allRecords) || allRecords == null)
             {
-                var fetched = await _transactionService.GetContractorsReportAsync(ReportDate.Value, Pin);
-                allRecords = fetched.ToList();
+                var collected = new List<AttendanceRecord>();
+                var from = FromDate!.Value;
+                var to = ToDate!.Value;
+                var dayCount = (to.Date - from.Date).Days;
+
+                for (int i = 0; i <= dayCount; i++)
+                {
+                    var day = from.Date.AddDays(i);
+                    var fetched = await _transactionService.GetContractorsReportAsync(day, Pin);
+                    collected.AddRange(fetched);
+                }
+
+                allRecords = collected
+                    .Where(r =>
+                    {
+                        var recordStart = r.FirstPunch ?? r.Date;
+                        var recordEnd = r.LastPunch ?? recordStart;
+                        return recordEnd >= from && recordStart <= to;
+                    })
+                    .ToList();
                 _cache.Set(cacheKey, allRecords, TimeSpan.FromMinutes(5));
             }
-
-            Factories = allRecords
-                .Select(r => r.Factory)
-                .Where(f => !string.IsNullOrEmpty(f))
-                .Distinct()
-                .OrderBy(f => f)
-                .ToList();
-
-            BUs = allRecords
-                .Where(r => string.IsNullOrEmpty(Factory) || r.Factory == Factory)
-                .Select(r => r.BU)
-                .Where(b => !string.IsNullOrEmpty(b) && !b.Equals("JIAHSIN", StringComparison.OrdinalIgnoreCase))
-                .Distinct()
-                .OrderBy(b => b)
-                .ToList();
-
-            Types = allRecords
-                .Select(r => r.Evaluation)
-                .Where(t => !string.IsNullOrEmpty(t))
-                .SelectMany(t => t.Split(new[] { ',', '[', ']' }, StringSplitOptions.RemoveEmptyEntries))
-                .Select(t => t.Trim())
-                .Distinct()
-                .OrderBy(t => t)
-                .ToList();
+            // Types are now static from AttendanceOptions.Types
 
             var filtered = allRecords.AsEnumerable();
             if (!string.IsNullOrEmpty(Factory))
-                filtered = filtered.Where(r => r.Factory == Factory);
+                filtered = filtered.Where(r => AttendanceFilterHelper.IsFactoryMatch(r, Factory));
             if (!string.IsNullOrEmpty(BU))
-                filtered = filtered.Where(r => r.BU == BU);
-            if (SelectedTypes != null && SelectedTypes.Any())
-            {
-                filtered = filtered.Where(r => r.Evaluation.Split(new[] { ',', '[', ']' }, StringSplitOptions.RemoveEmptyEntries)
-                                .Select(s => s.Trim())
-                                .Any(code => SelectedTypes.Contains(code)));
-            }
+                filtered = filtered.Where(r => AttendanceFilterHelper.IsBUMatch(r, Factory, BU));
+            filtered = AttendanceFilterHelper.ApplyTypeFilter(filtered, SelectedTypes);
 
             Records = filtered.ToList();
         }
@@ -98,26 +106,19 @@ public class ContractorAttendanceModel : PageModel
 
     public string GetTypeLabel(string type)
     {
-        return type switch
-        {
-            "B" => "[B] Missing required 2+2 records",
-            "C1" => "[C1] Gate Entry 30m Early",
-            "C2" => "[C2] Gate Exit > 30m after Attend Out",
-            "D1" => "[D1] Late Arrival",
-            "D2" => "[D2] Early Departure",
-            _ => type
-        };
+        return AttendanceFilterHelper.GetContractorTypeLabel(type);
     }
 
     public async Task<JsonResult> OnGetDetailsAsync(string pin, string date)
     {
         if (DateTime.TryParse(date, out var d))
         {
-            var start = d.Date;
-            var end = d.Date.AddDays(1).AddSeconds(-1);
+            var start = d.Date.AddHours(4);
+            var end = start.AddDays(1).AddHours(2);
             var logs = await _transactionService.GetTransactionsByRangeAsync(pin, start, end);
             return new JsonResult(logs);
         }
         return new JsonResult(new List<AccTransaction>());
     }
 }
+

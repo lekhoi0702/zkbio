@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using ZkbioDashboard.Helpers;
 using ZkbioDashboard.Models;
 using ZkbioDashboard.Services;
 using Microsoft.Extensions.Caching.Memory;
@@ -19,12 +20,14 @@ public class EarlyExitReportModel : PageModel
 
     // ---- Filter inputs ----
     [BindProperty(SupportsGet = true)] public DateTime? ReportDate         { get; set; }
-    [BindProperty(SupportsGet = true)] public int       ThresholdMinutes   { get; set; } = 5;
+    [BindProperty(SupportsGet = true)] public int       ThresholdMinutes   { get; set; } = 1;
     [BindProperty(SupportsGet = true)] public string?   Factory            { get; set; }
+    [BindProperty(SupportsGet = true)] public string?   BU                 { get; set; }
 
     // ---- Results ----
     public IEnumerable<EarlyExitRecord> Records    { get; private set; } = [];
     public List<string>                 Factories  { get; private set; } = [];
+    public List<string>                 BUs        { get; private set; } = [];
     
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
@@ -35,11 +38,17 @@ public class EarlyExitReportModel : PageModel
 
     public async Task OnGetAsync()
     {
+        Factories = AttendanceOptions.Factories.ToList();
+        BUs = AttendanceOptions.BUs.ToList();
         ReportDate ??= DateTime.Today;
-        if (ThresholdMinutes <= 0) ThresholdMinutes = 5;
+        if (ThresholdMinutes <= 0) ThresholdMinutes = 1;
         if (ThresholdMinutes > 60) ThresholdMinutes = 60;
 
-        string cacheKey = $"EarlyExit_{ReportDate.Value:yyyyMMdd}_{ThresholdMinutes}_{Factory}";
+        string cacheKey = CacheKeyHelper.EarlyExit(
+            ReportDate.Value,
+            ThresholdMinutes,
+            Factory,
+            BU);
         
         if (!_cache.TryGetValue(cacheKey, out List<EarlyExitRecord>? allRecords) || allRecords == null)
         {
@@ -49,14 +58,18 @@ public class EarlyExitReportModel : PageModel
             _cache.Set(cacheKey, allRecords, TimeSpan.FromMinutes(5));
         }
 
-        Factories = new List<string> { "JIAHSIN", "JSG", "JT1", "JT2", "PD1", "SHIMMER" };
 
         var filtered = string.IsNullOrEmpty(Factory)
             ? allRecords
-            : allRecords.Where(r => 
-                r.Factory == Factory || 
-                (Factory == "JIAHSIN" && r.Factory == "JSG")
-              ).ToList();
+            : allRecords.Where(r =>
+                AttendanceFilterHelper.IsFactoryMatch(r.Factory, r.FactoryCluster, Factory)).ToList();
+
+        if (!string.IsNullOrEmpty(BU))
+        {
+            filtered = filtered
+                .Where(r => AttendanceFilterHelper.IsBUMatch(r.BU, r.FactoryCluster, Factory, BU))
+                .ToList();
+        }
 
         TotalCount = filtered.Count;
 
@@ -71,21 +84,11 @@ public class EarlyExitReportModel : PageModel
         if (!DateTime.TryParse(date, out var parsedDate))
             return new JsonResult(Array.Empty<object>());
 
-        // Fetch all transactions for that PIN for the full day window (04:00 → next 04:00)
-        var start = parsedDate.Date.AddHours(4);
-        var end   = start.AddDays(1);
+        // Fetch all transactions for that PIN (00:00 selected day -> 06:00 next day)
+        var start = parsedDate.Date;
+        var end   = parsedDate.Date.AddDays(1).AddHours(6);
         var records = await _transactionService.GetTransactionsByRangeAsync(pin, start, end);
-
-        var result = records.Select(t => new
-        {
-            eventTime         = t.EventTime,
-            areaName          = t.AreaName,
-            type              = t.Type,
-            devAlias          = t.DevAlias,
-            eventPointName    = t.EventPointName,
-            verifyModeDisplay = t.VerifyModeDisplay,
-            status            = t.Status
-        });
-        return new JsonResult(result);
+        return new JsonResult(records);
     }
 }
+

@@ -56,7 +56,7 @@ public class LoginModel : PageModel
                 new ClaimsPrincipal(claimsIdentity),
                 authProperties);
 
-            return RedirectToPage("/PersonalAttendance");
+            return Redirect("/personnel-access-history");
         }
 
         ErrorMessage = "Invalid username or password.";

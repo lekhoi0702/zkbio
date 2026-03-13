@@ -40,8 +40,8 @@ public class PersonalAttendanceModel : PageModel
     {
         if (DateTime.TryParse(date, out var d))
         {
-            var start = d.Date;
-            var end = d.Date.AddDays(1).AddSeconds(-1);
+            var start = d.Date.AddHours(4);
+            var end = start.AddDays(1).AddHours(2);
             var logs = await _transactionService.GetTransactionsByRangeAsync(pin, start, end);
             return new JsonResult(logs);
         }

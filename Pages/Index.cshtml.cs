@@ -5,8 +5,8 @@ namespace zkbio.Pages;
 
 public class IndexModel : PageModel
 {
-    public void OnGet()
+    public IActionResult OnGet()
     {
-
+        return Redirect("/personnel-access-history");
     }
 }

@@ -1,0 +1,125 @@
+@page "/bu-type-summary"
+@model ZkbioDashboard.Pages.BuTypeSummaryModel
+@{
+    ViewData["Title"] = "BU Type Summary";
+}
+
+<section class="content report-shell" style="padding:0;">
+    <div class="container-fluid px-0 d-flex flex-column" style="height:calc(100vh - 57px); overflow:hidden; gap:0;">
+
+        <div class="at-page-header">
+            <h1>BU Type Summary</h1>
+        </div>
+
+        <div class="at-filter-card">
+            <div class="at-filter-body">
+                <form method="get">
+                    <div class="at-filter-grid">
+                        <div>
+                            <label>Date</label>
+                            <input type="date" asp-for="ReportDate" class="form-control" />
+                        </div>
+                        <div>
+                            <label>Factory</label>
+                            <select asp-for="Factory" class="form-control">
+                                <option value="">-- All --</option>
+                                @foreach (var factory in Model.Factories)
+                                {
+                                    <option value="@factory">@factory</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="at-filter-actions">
+                            <button type="submit" class="at-btn at-btn-primary" title="Apply">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <a asp-page="./BuTypeSummary" class="at-btn at-btn-ghost" title="Reset">
+                                <i class="fas fa-undo-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="at-table-card">
+            <div class="at-table-scroll">
+                <table class="at-table js-sortable-table">
+                    <thead>
+                        <tr>
+                            <th>BU</th>
+                            <th>Total Manpower</th>
+                            <th>
+                                B
+                                <div class="th-sub">Missing 2+2 records</div>
+                            </th>
+                            <th>
+                                C1
+                                <div class="th-sub">Gate Entry 30m Early</div>
+                            </th>
+                            <th>
+                                C2
+                                <div class="th-sub">Gate Exit &gt; 30m after Attend Out</div>
+                            </th>
+                            <th>
+                                D1
+                                <div class="th-sub">Late Arrival</div>
+                            </th>
+                            <th>
+                                D2
+                                <div class="th-sub">Early Departure</div>
+                            </th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="skeleton-loader">
+                        @for (int i = 0; i < 18; i++)
+                        {
+                            <tr>
+                                <td><div class="skeleton skeleton-text" style="width:100px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:60px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:40px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:40px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:40px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:40px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:40px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:60px"></div></td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tbody id="table-data">
+                        @if (Model.Rows.Any())
+                        {
+                            foreach (var row in Model.Rows)
+                            {
+                                <tr>
+                                    <td>@row.BU</td>
+                                    <td>@row.AttendanceCount</td>
+                                    <td>@row.B</td>
+                                    <td>@row.C1</td>
+                                    <td>@row.C2</td>
+                                    <td>@row.D1</td>
+                                    <td>@row.D2</td>
+                                    <td>@row.Total</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr><td colspan="8" class="at-empty">No data found for the selected date.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="at-footer">
+                <ul class="at-pagination">
+                    <li style="display:flex;align-items:center;padding:0 8px;">
+                        <span class="at-footer-total">@Model.Rows.Count.ToString("N0") records</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</section>
+
