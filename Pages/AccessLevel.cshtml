@@ -1,0 +1,189 @@
+@page "/access-level"
+@model ZkbioDashboard.Pages.AccessLevelModel
+@{
+    ViewData["Title"] = "Access Level";
+}
+
+<section class="content report-shell" style="padding:0; --at-filter-col-min: 160px;">
+    <div class="container-fluid px-0 d-flex flex-column" style="height:calc(100vh - 57px); overflow:hidden; gap:0;">
+
+        <div class="at-page-header">
+            <h1>Access Level</h1>
+        </div>
+
+        <div class="at-filter-card">
+            <div class="at-filter-body">
+                <form method="get" id="accessLevelFilterForm">
+                    <div class="at-filter-grid">
+                        <div>
+                            <label>PIN</label>
+                            <input type="text" asp-for="Pin" class="form-control" placeholder="Search PIN..." />
+                        </div>
+                        <div>
+                            <label>Department</label>
+                            <input type="text" asp-for="Department" class="form-control" placeholder="Filter department..." />
+                        </div>
+                        <div>
+                            <label>Full Name</label>
+                            <input type="text" asp-for="FullName" class="form-control" placeholder="Filter full name..." />
+                        </div>
+                        <div>
+                            <label>Access Level</label>
+                            <input type="text" asp-for="AccessLevel" class="form-control" placeholder="Filter access level..." />
+                        </div>
+                        <div class="at-filter-actions">
+                            <button type="submit" class="at-btn at-btn-primary" title="Apply">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <a asp-page="./AccessLevel" class="at-btn at-btn-ghost" title="Reset">
+                                <i class="fas fa-undo-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="at-table-card">
+            <div class="at-table-scroll">
+                <table class="at-table js-sortable-table">
+                    <thead>
+                        <tr>
+                            <th>Department</th>
+                            <th>PIN</th>
+                            <th>Full Name</th>
+                            <th>Access Level</th>
+                        </tr>
+                    </thead>
+                    <tbody id="skeleton-loader">
+                        @for (int i = 0; i < 19; i++)
+                        {
+                            <tr>
+                                <td><div class="skeleton skeleton-text" style="width:180px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:80px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:160px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:220px"></div></td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tbody id="table-data"></tbody>
+                </table>
+            </div>
+            <div class="at-footer">
+                <ul class="at-pagination" id="accessLevelPagination">
+                    <li style="display:flex;align-items:center;padding:0 8px;">
+                        <span class="at-footer-total" id="accessLevelTotal">0 records</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        $(function () {
+            initAccessLevelAjax();
+        });
+
+        function initAccessLevelAjax() {
+            if (window.__accessLevelAjaxInit) return;
+            window.__accessLevelAjaxInit = true;
+
+            var $form = $('#accessLevelFilterForm');
+            var $tbody = $('#table-data');
+            var $total = $('#accessLevelTotal');
+            var $pagination = $('#accessLevelPagination');
+
+            function setLoading(isLoading) {
+                if (isLoading) $('body').addClass('is-loading');
+                else $('body').removeClass('is-loading');
+            }
+
+            function renderRows(rows) {
+                if (!rows || rows.length === 0) {
+                    $tbody.html('<tr><td colspan="4" class="at-empty">No data found.</td></tr>');
+                    return;
+                }
+
+                var html = rows.map(function(item) {
+                    return '<tr>'
+                        + '<td>' + (item.departmentList || '-') + '</td>'
+                        + '<td>' + (item.pin || '-') + '</td>'
+                        + '<td>' + (item.fullName || '-') + '</td>'
+                        + '<td>' + (item.accessLevelList || '-') + '</td>'
+                        + '</tr>';
+                }).join('');
+
+                $tbody.html(html);
+            }
+
+            function buildQuery(pageNumber) {
+                if (!$form.length) return new URLSearchParams(window.location.search).toString();
+                var params = new URLSearchParams(new FormData($form[0]));
+                params.set('PageNumber', pageNumber || 1);
+                return params.toString();
+            }
+
+            function updateUrl(query) {
+                var newUrl = window.location.pathname + (query ? '?' + query : '');
+                window.history.replaceState({}, '', newUrl);
+            }
+
+            function renderPagination(pageNumber, totalPages) {
+                var html = '';
+                var prevDisabled = pageNumber <= 1 ? 'disabled' : '';
+                var nextDisabled = pageNumber >= totalPages ? 'disabled' : '';
+                html += '<li class="' + prevDisabled + '"><a href="#" data-page="' + (pageNumber - 1) + '">&laquo;</a></li>';
+                var start = Math.max(1, pageNumber - 5);
+                var end = Math.min(totalPages, pageNumber + 5);
+                for (var i = start; i <= end; i++) {
+                    var active = i === pageNumber ? 'active' : '';
+                    html += '<li class="' + active + '"><a href="#" data-page="' + i + '">' + i + '</a></li>';
+                }
+                html += '<li class="' + nextDisabled + '"><a href="#" data-page="' + (pageNumber + 1) + '">&raquo;</a></li>';
+                $pagination.find('li').not(':first').remove();
+                $pagination.append(html);
+            }
+
+            function fetchData(pageNumber) {
+                try {
+                    setLoading(true);
+                    var query = buildQuery(pageNumber);
+                    updateUrl(query);
+                    var url = query ? ('?handler=Data&' + query) : '?handler=Data';
+                    fetch(url, { headers: { 'Accept': 'application/json' } })
+                        .then(function(r) { return r.json(); })
+                        .then(function(resp) {
+                            $total.text((resp.totalCount || 0).toLocaleString() + ' records');
+                            renderRows(resp.data || []);
+                            renderPagination(resp.pageNumber || 1, resp.totalPages || 0);
+                        })
+                        .catch(function() {
+                            $tbody.html('<tr><td colspan="4" class="at-empty">No data found.</td></tr>');
+                            $total.text('0 records');
+                            renderPagination(1, 0);
+                        })
+                        .finally(function() { setLoading(false); });
+                } catch (err) {
+                    setLoading(false);
+                }
+            }
+
+            $form.on('submit', function(e) {
+                e.preventDefault();
+                fetchData(1);
+            });
+
+            $pagination.on('click', 'a[data-page]', function(e) {
+                e.preventDefault();
+                var page = parseInt($(this).data('page'), 10);
+                if (!Number.isNaN(page) && page > 0) fetchData(page);
+            });
+
+            fetchData(parseInt(new URLSearchParams(window.location.search).get('PageNumber') || '1', 10));
+            setTimeout(function() { setLoading(false); }, 10000);
+        }
+    </script>
+}

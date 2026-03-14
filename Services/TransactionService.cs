@@ -16,6 +16,7 @@ public interface ITransactionService
     Task<IEnumerable<AttendanceRecord>> GetContractorsReportAsync(DateTime date, string? pin = null, string? factory = null);
     Task<IEnumerable<AttendanceRecord>> GetPersonalAttendanceReportAsync(string pin, DateTime fromDate, DateTime toDate);
     Task<IEnumerable<AccTransaction>> GetTransactionsByRangeAsync(string pin, DateTime start, DateTime end);
+    Task<IEnumerable<AccessLevelRecord>> GetAccessLevelsAsync(string? pin = null);
 
     /// <summary>
     /// Returns employees whose first gate-out occurred within <paramref name="thresholdMinutes"/> of their Attend In.
@@ -423,6 +424,65 @@ public class TransactionService : ITransactionService
 
         var results = await Task.WhenAll(tasks);
         return results.SelectMany(r => r).OrderBy(t => t.EventTime);
+    }
+
+    // -------------------------------------------------------------------------
+    // Access Level (merged across servers by PIN)
+    // -------------------------------------------------------------------------
+
+    public async Task<IEnumerable<AccessLevelRecord>> GetAccessLevelsAsync(string? pin = null)
+    {
+        const string sql = @"
+            SELECT 
+                auth_department.name AS DepartmentName,
+                pers_person.pin AS Pin,
+                CONCAT(pers_person.last_name, ' ', pers_person.name) AS FullName,
+                acc_level.name AS AccessLevelName
+            FROM pers_person
+            INNER JOIN auth_department ON pers_person.auth_dept_id = auth_department.id
+            INNER JOIN acc_level_person ON pers_person.id = acc_level_person.pers_person_id
+            INNER JOIN acc_level ON acc_level.id = acc_level_person.level_id
+            WHERE (@Pin IS NULL OR pers_person.pin LIKE @Pin)";
+
+        var tasks = GetConnectionStrings().Select(async connStr =>
+        {
+            using var connection = new SqlConnection(connStr);
+            return await connection.QueryAsync<dynamic>(sql, new
+            {
+                Pin = string.IsNullOrWhiteSpace(pin) ? null : $"%{pin}%"
+            });
+        });
+
+        var results = await Task.WhenAll(tasks);
+        var merged = results.SelectMany(r => r)
+            .GroupBy(r => (string)r.Pin, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var fullName = g.Select(x => (string)x.FullName).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "";
+                var departments = g.Select(x => (string)x.DepartmentName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x)
+                    .ToList();
+                var accessLevels = g.Select(x => (string)x.AccessLevelName)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x)
+                    .ToList();
+
+                return new AccessLevelRecord
+                {
+                    Pin = g.Key,
+                    FullName = fullName,
+                    Departments = departments,
+                    AccessLevels = accessLevels
+                };
+            })
+            .OrderBy(x => x.DepartmentList)
+            .ThenBy(x => x.FullName)
+            .ToList();
+
+        return merged;
     }
 
     // -------------------------------------------------------------------------

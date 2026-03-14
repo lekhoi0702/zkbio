@@ -42,6 +42,13 @@ public class ContractorAttendanceModel : PageModel
     public List<string> BUs { get; set; } = new();
     public List<string> Types { get; set; } = new();
 
+    [BindProperty(SupportsGet = true)]
+    public int PageNumber { get; set; } = 1;
+
+    public int PageSize { get; set; } = 50;
+    public int TotalCount { get; set; }
+    public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
+
     public async Task OnGetAsync()
     {
         Factories = AttendanceOptions.Factories.ToList();
@@ -96,11 +103,17 @@ public class ContractorAttendanceModel : PageModel
                 filtered = filtered.Where(r => AttendanceFilterHelper.IsBUMatch(r, Factory, BU));
             filtered = AttendanceFilterHelper.ApplyTypeFilter(filtered, SelectedTypes);
 
-            Records = filtered.ToList();
+            var filteredList = filtered.ToList();
+            TotalCount = filteredList.Count;
+            Records = filteredList
+                .Skip((PageNumber - 1) * PageSize)
+                .Take(PageSize)
+                .ToList();
         }
         catch (Exception)
         {
             Records = null;
+            TotalCount = 0;
         }
     }
 

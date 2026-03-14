@@ -111,13 +111,12 @@ public static class AttendanceHelper
     {
         var gateIn = acsLogs.FirstOrDefault(t =>
             t.EventPointName != null &&
-            (((string)t.EventPointName).Contains("IN", StringComparison.OrdinalIgnoreCase) ||
-             ((string)t.EventPointName).Contains("ENTRY", StringComparison.OrdinalIgnoreCase)));
+            (((string)t.EventPointName).Contains("IN", StringComparison.OrdinalIgnoreCase) ));
 
         var gateOut = acsLogs.LastOrDefault(t =>
             t.EventPointName != null &&
-            (((string)t.EventPointName).Contains("OUT", StringComparison.OrdinalIgnoreCase) ||
-             ((string)t.EventPointName).Contains("EXIT", StringComparison.OrdinalIgnoreCase)));
+            (((string)t.EventPointName).Contains("OUT", StringComparison.OrdinalIgnoreCase) 
+             ));
 
         return (gateIn, gateOut);
     }

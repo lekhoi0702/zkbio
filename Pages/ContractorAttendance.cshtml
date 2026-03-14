@@ -117,6 +117,37 @@
                     </tbody>
                 </table>
             </div>
+            <div class="at-footer">
+                <ul class="at-pagination">
+                    <li style="display:flex;align-items:center;padding:0 8px;">
+                        <span class="at-footer-total">@Model.TotalCount.ToString("N0") records</span>
+                    </li>
+                    @{
+                        var baseRoute = new Dictionary<string, string> {
+                            { "FromDate", Model.FromDate?.ToString("yyyy-MM-ddTHH:mm") ?? "" },
+                            { "ToDate", Model.ToDate?.ToString("yyyy-MM-ddTHH:mm") ?? "" },
+                            { "Factory", Model.Factory ?? "" },
+                            { "BU",      Model.BU ?? "" },
+                            { "Pin",     Model.Pin ?? "" }
+                        };
+                    }
+                    <li class="@(Model.PageNumber <= 1 ? "disabled" : "")">
+                        @{ var prevRoute = new Dictionary<string, string>(baseRoute); prevRoute["PageNumber"] = (Model.PageNumber - 1).ToString(); }
+                        <a asp-page="./ContractorAttendance" asp-all-route-data="prevRoute">&laquo;</a>
+                    </li>
+                    @for (int i = Math.Max(1, Model.PageNumber - 5); i <= Math.Min(Model.TotalPages, Model.PageNumber + 5); i++)
+                    {
+                        <li class="@(i == Model.PageNumber ? "active" : "")">
+                            @{ var currRoute = new Dictionary<string, string>(baseRoute); currRoute["PageNumber"] = i.ToString(); }
+                            <a asp-page="./ContractorAttendance" asp-all-route-data="currRoute">@i</a>
+                        </li>
+                    }
+                    <li class="@(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                        @{ var nextRoute = new Dictionary<string, string>(baseRoute); nextRoute["PageNumber"] = (Model.PageNumber + 1).ToString(); }
+                        <a asp-page="./ContractorAttendance" asp-all-route-data="nextRoute">&raquo;</a>
+                    </li>
+                </ul>
+            </div>
         </div>
 
     </div>
