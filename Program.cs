@@ -7,8 +7,8 @@ QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Force the app to listen on port 5000.
-builder.WebHost.UseUrls("http://127.0.0.1:5000");
+// Force the app to listen on port 5000 (all interfaces).
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
 // Add services to the container.
 builder.Services.AddRazorPages(options =>
@@ -19,6 +19,8 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizePage("/AttendanceReport");
     options.Conventions.AuthorizePage("/ContractorAttendance");
     options.Conventions.AuthorizePage("/EarlyExitReport");
+    options.Conventions.AuthorizePage("/AccessLevel");
+    options.Conventions.AuthorizePage("/Device");
 });
 
 builder.Services.AddControllers();

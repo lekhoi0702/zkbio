@@ -17,6 +17,7 @@ public interface ITransactionService
     Task<IEnumerable<AttendanceRecord>> GetPersonalAttendanceReportAsync(string pin, DateTime fromDate, DateTime toDate);
     Task<IEnumerable<AccTransaction>> GetTransactionsByRangeAsync(string pin, DateTime start, DateTime end);
     Task<IEnumerable<AccessLevelRecord>> GetAccessLevelsAsync(string? pin = null);
+    Task<IEnumerable<DeviceRecord>> GetDevicesAsync(string? factory = null);
 
     /// <summary>
     /// Returns employees whose first gate-out occurred within <paramref name="thresholdMinutes"/> of their Attend In.
@@ -231,7 +232,6 @@ public class TransactionService : ITransactionService
             var serverIp     = DepartmentHelper.GetServerIp(connStr);
             var factoryCluster = ResolveFactoryClusterByServerIp(serverIp);
             var rootNames    = ServerConstants.GetPersonalRootNames(serverIp);
-            var allowedDepts = DepartmentHelper.BuildAllowedDepartments(departments, rootNames);
 
             var queryStart = fromDate.AddHours(-12);
             var queryEnd   = toDate.AddDays(1).AddHours(36);
@@ -251,19 +251,6 @@ public class TransactionService : ITransactionService
 
             var deptMapByCode = departmentCache.ByCode;
             var deptMapByName = departmentCache.ByName;
-
-            // Verify this person belongs to an allowed department
-            bool isAllowed = pinTransactions.Any(t =>
-            {
-                var dId = DepartmentHelper.ResolveDeptId(
-                    t.DeptCode != null ? (string)t.DeptCode : null,
-                    t.DeptName != null ? (string)t.DeptName : null,
-                    deptMapByCode, deptMapByName, departments);
-                return dId != null && allowedDepts.Contains(dId);
-            });
-
-            if (!isAllowed)
-                continue;
 
             for (var date = fromDate; date <= toDate; date = date.AddDays(1))
             {
@@ -483,6 +470,83 @@ public class TransactionService : ITransactionService
             .ToList();
 
         return merged;
+    }
+
+    // -------------------------------------------------------------------------
+    // Devices (merged across servers)
+    // -------------------------------------------------------------------------
+
+    public async Task<IEnumerable<DeviceRecord>> GetDevicesAsync(string? factory = null)
+    {
+        const string sql = @"
+            SELECT 
+                acc_device.dev_alias AS DevAlias,
+                acc_device.sn AS SN,
+                auth_area.name AS AreaName,
+                acc_device.ip_address AS IpAddress,
+                acc_device.device_name AS DeviceName,
+                acc_device.is_registrationdevice AS IsRegistrationDevice,
+                acc_device.fw_version AS FwVersion
+            FROM acc_device
+            INNER JOIN auth_area ON acc_device.auth_area_id = auth_area.id";
+
+        var tasks = GetConnectionStrings().Select(async connStr =>
+        {
+            using var connection = new SqlConnection(connStr);
+            var serverIp = DepartmentHelper.GetServerIp(connStr);
+            var rows = await connection.QueryAsync<dynamic>(sql);
+            return rows.Select(r => new
+            {
+                ServerIp = serverIp,
+                DevAlias = (string?)r.DevAlias ?? "",
+                SN = (string?)r.SN ?? "",
+                AreaName = (string?)r.AreaName ?? "",
+                IpAddress = (string?)r.IpAddress ?? "",
+                DeviceName = (string?)r.DeviceName ?? "",
+                IsRegistrationDevice = r.IsRegistrationDevice is bool b ? b : r.IsRegistrationDevice?.ToString() == "1",
+                FwVersion = (string?)r.FwVersion ?? ""
+            });
+        });
+
+        var results = await Task.WhenAll(tasks);
+        var all = results.SelectMany(r => r)
+            .Where(r =>
+            {
+                if (string.IsNullOrWhiteSpace(factory))
+                    return true;
+                var selectedFactory = factory.Trim();
+                if (selectedFactory.Equals("SHIMMER", StringComparison.OrdinalIgnoreCase))
+                {
+                    var serverFactory = ResolveFactoryClusterByServerIp(r.ServerIp);
+                    return serverFactory.Equals("SHIMMER", StringComparison.OrdinalIgnoreCase);
+                }
+                if (selectedFactory.Equals("JIAHSIN", StringComparison.OrdinalIgnoreCase))
+                {
+                    var serverFactory = ResolveFactoryClusterByServerIp(r.ServerIp);
+                    return serverFactory.Equals("JIAHSIN", StringComparison.OrdinalIgnoreCase);
+                }
+
+                return r.AreaName.Contains(selectedFactory, StringComparison.OrdinalIgnoreCase)
+                    || r.DevAlias.Contains(selectedFactory, StringComparison.OrdinalIgnoreCase);
+            })
+            .Select(r => new DeviceRecord
+            {
+                DevAlias = r.DevAlias,
+                SN = r.SN,
+                AreaName = r.AreaName,
+                IpAddress = r.IpAddress,
+                DeviceName = r.DeviceName,
+                IsRegistrationDevice = r.IsRegistrationDevice,
+                FwVersion = r.FwVersion
+            })
+            .ToList();
+
+        return all
+            .GroupBy(d => $"{d.DevAlias}||{d.SN}||{d.IpAddress}", StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(d => d.AreaName)
+            .ThenBy(d => d.DevAlias)
+            .ToList();
     }
 
     // -------------------------------------------------------------------------

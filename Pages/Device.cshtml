@@ -1,0 +1,250 @@
+@page "/device"
+@model ZkbioDashboard.Pages.DeviceModel
+@{
+    ViewData["Title"] = "Device";
+}
+
+<section class="content report-shell" style="padding:0; --at-filter-col-min: 160px;">
+    <div class="container-fluid px-0 d-flex flex-column" style="height:calc(100vh - 57px); overflow:hidden; gap:0;">
+
+        <div class="at-page-header">
+            <h1>Device</h1>
+        </div>
+
+        <div class="at-filter-card">
+            <div class="at-filter-body">
+                <form method="get" id="deviceFilterForm">
+                    <div class="at-filter-grid">
+                        <div>
+                            <label>Factory</label>
+                            <select asp-for="Factory" class="form-control">
+                                <option value="">-- All --</option>
+                                @foreach (var factory in Model.Factories)
+                                {
+                                    <option value="@factory">@factory</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label>Device Type</label>
+                            <select asp-for="DeviceType" class="form-control">
+                                <option value="">-- All --</option>
+                                <option value="ATT">ATT</option>
+                                <option value="ACS">ACS</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Dev Alias</label>
+                            <input type="text" asp-for="DevAlias" class="form-control" placeholder="Filter Dev Alias..." />
+                        </div>
+                        <div>
+                            <label>SN</label>
+                            <input type="text" asp-for="SN" class="form-control" placeholder="Filter SN..." />
+                        </div>
+                        <div>
+                            <label>Area</label>
+                            <input type="text" asp-for="AreaName" class="form-control" placeholder="Filter Area..." />
+                        </div>
+                        <div>
+                            <label>IP Address</label>
+                            <input type="text" asp-for="IpAddress" class="form-control" placeholder="Filter IP..." />
+                        </div>
+                        <div>
+                            <label>Device Name</label>
+                            <input type="text" asp-for="DeviceName" class="form-control" placeholder="Filter Device Name..." />
+                        </div>
+                        <div>
+                            <label>Status</label>
+                            <select asp-for="Status" class="form-control">
+                                <option value="">-- All --</option>
+                                <option value="Online">Online</option>
+                                <option value="Offline">Offline</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Register Device</label>
+                            <select asp-for="IsRegistrationDevice" class="form-control">
+                                <option value="">-- All --</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>FW Version</label>
+                            <input type="text" asp-for="FwVersion" class="form-control" placeholder="Filter FW..." />
+                        </div>
+                        <div class="at-filter-actions">
+                            <button type="submit" class="at-btn at-btn-primary" title="Apply">
+                                <i class="fas fa-search"></i>
+                            </button>
+                            <a asp-page="./Device" class="at-btn at-btn-ghost" title="Reset">
+                                <i class="fas fa-undo-alt"></i>
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="at-table-card">
+            <div class="at-table-scroll">
+                <table class="at-table js-sortable-table">
+                    <thead>
+                        <tr>
+                            <th>Dev Alias</th>
+                            <th>SN</th>
+                            <th>Area</th>
+                            <th>IP Address</th>
+                            <th class="device-status-header">Status</th>
+                            <th>Device Name</th>
+                            <th>Register Device</th>
+                            <th>FW Version</th>
+                        </tr>
+                    </thead>
+                    <tbody id="skeleton-loader">
+                        @for (int i = 0; i < 19; i++)
+                        {
+                            <tr>
+                                <td><div class="skeleton skeleton-text" style="width:140px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:120px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:120px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:120px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:90px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:160px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:110px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:120px"></div></td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tbody id="table-data"></tbody>
+                </table>
+            </div>
+            <div class="at-footer">
+                <ul class="at-pagination" id="devicePagination">
+                    <li style="display:flex;align-items:center;padding:0 8px;">
+                        <span class="at-footer-total" id="deviceTotal">0 records</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        $(function () {
+            initDeviceAjax();
+        });
+
+        function initDeviceAjax() {
+            if (window.__deviceAjaxInit) return;
+            window.__deviceAjaxInit = true;
+
+            var $form = $('#deviceFilterForm');
+            var $tbody = $('#table-data');
+            var $total = $('#deviceTotal');
+            var $pagination = $('#devicePagination');
+
+            function setLoading(isLoading) {
+                if (isLoading) $('body').addClass('is-loading');
+                else $('body').removeClass('is-loading');
+            }
+
+            function renderRows(rows) {
+                if (!rows || rows.length === 0) {
+                    $tbody.html('<tr><td colspan="8" class="at-empty">No data found.</td></tr>');
+                    return;
+                }
+
+                var html = rows.map(function(item) {
+                    var statusText = (item.status || '-');
+                    var statusClass = statusText === 'Online'
+                        ? 'device-status device-status-online'
+                        : 'device-status device-status-offline';
+                    var regIcon = item.isRegistrationDevice
+                        ? '<span class="device-reg device-reg-yes" title="Registered"><i class="fas fa-check-circle"></i></span>'
+                        : '<span class="device-reg device-reg-no" title="Not registered"><i class="fas fa-times-circle"></i></span>';
+                    return '<tr>'
+                        + '<td>' + (item.devAlias || '-') + '</td>'
+                        + '<td>' + (item.sn || '-') + '</td>'
+                        + '<td>' + (item.areaName || '-') + '</td>'
+                        + '<td>' + (item.ipAddress || '-') + '</td>'
+                        + '<td class="device-status-cell"><span class="' + statusClass + '">' + statusText + '</span></td>'
+                        + '<td>' + (item.deviceName || '-') + '</td>'
+                        + '<td>' + regIcon + '</td>'
+                        + '<td>' + (item.fwVersion || '-') + '</td>'
+                        + '</tr>';
+                }).join('');
+
+                $tbody.html(html);
+            }
+
+            function renderPagination(pageNumber, totalPages) {
+                var html = '';
+                var prevDisabled = pageNumber <= 1 ? 'disabled' : '';
+                var nextDisabled = pageNumber >= totalPages ? 'disabled' : '';
+                html += '<li class="' + prevDisabled + '"><a href="#" data-page="' + (pageNumber - 1) + '">&laquo;</a></li>';
+                var start = Math.max(1, pageNumber - 5);
+                var end = Math.min(totalPages, pageNumber + 5);
+                for (var i = start; i <= end; i++) {
+                    var active = i === pageNumber ? 'active' : '';
+                    html += '<li class="' + active + '"><a href="#" data-page="' + i + '">' + i + '</a></li>';
+                }
+                html += '<li class="' + nextDisabled + '"><a href="#" data-page="' + (pageNumber + 1) + '">&raquo;</a></li>';
+                $pagination.find('li').not(':first').remove();
+                $pagination.append(html);
+            }
+
+            function buildQuery(pageNumber) {
+                if (!$form.length) return new URLSearchParams(window.location.search).toString();
+                var params = new URLSearchParams(new FormData($form[0]));
+                params.set('PageNumber', pageNumber || 1);
+                return params.toString();
+            }
+
+            function updateUrl(query) {
+                var newUrl = window.location.pathname + (query ? '?' + query : '');
+                window.history.replaceState({}, '', newUrl);
+            }
+
+            function fetchData(pageNumber) {
+                try {
+                    setLoading(true);
+                    var query = buildQuery(pageNumber);
+                    updateUrl(query);
+                    var url = query ? ('?handler=Data&' + query) : '?handler=Data';
+                    fetch(url, { headers: { 'Accept': 'application/json' } })
+                        .then(function(r) { return r.json(); })
+                        .then(function(resp) {
+                            $total.text((resp.totalCount || 0).toLocaleString() + ' records');
+                            renderRows(resp.data || []);
+                            renderPagination(resp.pageNumber || 1, resp.totalPages || 0);
+                        })
+                        .catch(function() {
+                    $tbody.html('<tr><td colspan="8" class="at-empty">No data found.</td></tr>');
+                    $total.text('0 records');
+                    renderPagination(1, 0);
+                })
+                        .finally(function() { setLoading(false); });
+                } catch (err) {
+                    setLoading(false);
+                }
+            }
+
+            $form.on('submit', function(e) {
+                e.preventDefault();
+                fetchData(1);
+            });
+
+            $pagination.on('click', 'a[data-page]', function(e) {
+                e.preventDefault();
+                var page = parseInt($(this).data('page'), 10);
+                if (!Number.isNaN(page) && page > 0) fetchData(page);
+            });
+
+            fetchData(parseInt(new URLSearchParams(window.location.search).get('PageNumber') || '1', 10));
+            setTimeout(function() { setLoading(false); }, 10000);
+        }
+    </script>
+}
