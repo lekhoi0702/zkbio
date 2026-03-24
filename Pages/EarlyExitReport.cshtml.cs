@@ -94,9 +94,7 @@ public class EarlyExitReportModel : PageModel
         if (!DateTime.TryParse(date, out var parsedDate))
             return new JsonResult(Array.Empty<object>());
 
-        // Fetch all transactions for that PIN (00:00 selected day -> 06:00 next day)
-        var start = parsedDate.Date;
-        var end   = parsedDate.Date.AddDays(1).AddHours(6);
+        var (start, end) = ShiftWindowPolicy.GetEarlyExitDetailWindow(parsedDate);
         var records = await _transactionService.GetTransactionsByRangeAsync(pin, start, end);
         return new JsonResult(records);
     }

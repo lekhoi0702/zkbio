@@ -48,11 +48,10 @@ public class ExportController : ControllerBase
         [FromForm] string? pin,
         [FromForm] string? factory,
         [FromForm] string? bu,
-        [FromForm] List<string> selectedTypes,
         [FromForm] string[] selectedColumns)
     {
         var allRecords = await _transactionService.GetAttendanceReportAsync(date, pin);
-        var filtered   = AttendanceFilterHelper.ApplyFilters(allRecords, factory, bu, selectedTypes);
+        var filtered   = AttendanceFilterHelper.ApplyFilters(allRecords, factory, bu);
 
         using var workbook  = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Attendance");
@@ -130,11 +129,10 @@ public class ExportController : ControllerBase
         [FromForm] string? pin,
         [FromForm] string? factory,
         [FromForm] string? bu,
-        [FromForm] List<string> selectedTypes,
         [FromForm] string[] selectedColumns)
     {
         var allRecords = await _transactionService.GetAttendanceReportAsync(date, pin);
-        var filtered   = AttendanceFilterHelper.ApplyFilters(allRecords, factory, bu, selectedTypes);
+        var filtered   = AttendanceFilterHelper.ApplyFilters(allRecords, factory, bu);
         var columns = selectedColumns.ToList();
         var generatedAt = DateTime.Now;
 
@@ -316,7 +314,6 @@ public class ExportController : ControllerBase
         "Attend In"     => item.AttendIn?.ToString("HH:mm:ss") ?? "",
         "Attend Out"    => item.AttendOut?.ToString("HH:mm:ss") ?? "",
         "Gate Out (ACS)"=> item.GateOut?.ToString("HH:mm:ss") ?? "",
-        "Type"          => AttendanceFilterHelper.FormatEffectiveType(item),
         _               => ""
     };
 
@@ -382,7 +379,6 @@ public class ExportController : ControllerBase
                     cols.ConstantColumn(48);
                     break;
                 case "BU":
-                case "Type":
                     cols.ConstantColumn(42);
                     break;
                 case "Status":

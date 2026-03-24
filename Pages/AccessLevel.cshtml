@@ -53,6 +53,7 @@
                             <th>PIN</th>
                             <th>Full Name</th>
                             <th>Access Level</th>
+                            <th>Update Time</th>
                         </tr>
                     </thead>
                     <tbody id="skeleton-loader">
@@ -63,6 +64,7 @@
                                 <td><div class="skeleton skeleton-text" style="width:80px"></div></td>
                                 <td><div class="skeleton skeleton-text" style="width:160px"></div></td>
                                 <td><div class="skeleton skeleton-text" style="width:220px"></div></td>
+                                <td><div class="skeleton skeleton-text" style="width:160px"></div></td>
                             </tr>
                         }
                     </tbody>
@@ -103,7 +105,7 @@
 
             function renderRows(rows) {
                 if (!rows || rows.length === 0) {
-                    $tbody.html('<tr><td colspan="4" class="at-empty">No data found.</td></tr>');
+                    $tbody.html('<tr><td colspan="5" class="at-empty">No data found.</td></tr>');
                     return;
                 }
 
@@ -113,6 +115,7 @@
                         + '<td>' + (item.pin || '-') + '</td>'
                         + '<td>' + (item.fullName || '-') + '</td>'
                         + '<td>' + (item.accessLevelList || '-') + '</td>'
+                        + '<td>' + (item.updateTimeDisplay || '-') + '</td>'
                         + '</tr>';
                 }).join('');
 
@@ -161,7 +164,7 @@
                             renderPagination(resp.pageNumber || 1, resp.totalPages || 0);
                         })
                         .catch(function() {
-                            $tbody.html('<tr><td colspan="4" class="at-empty">No data found.</td></tr>');
+                            $tbody.html('<tr><td colspan="5" class="at-empty">No data found.</td></tr>');
                             $total.text('0 records');
                             renderPagination(1, 0);
                         })

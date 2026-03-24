@@ -40,21 +40,6 @@
                             </select>
                         </div>
                         <div>
-                            <label>Type</label>
-                            <div class="at-type-dropdown">
-                                <button type="button" class="at-type-btn" id="typeDropdownBtn">-- All --</button>
-                                <div class="at-type-menu" id="typeDropdownMenu">
-                                    @foreach (var type in Model.Types)
-                                    {
-                                        <div class="custom-control custom-checkbox small mb-1">
-                                            <input class="custom-control-input" type="checkbox" name="SelectedTypes" value="@type" id="type_@type" @(Model.SelectedTypes.Contains(type) ? "checked" : "")>
-                                            <label class="custom-control-label" for="type_@type">@Model.GetTypeLabel(type)</label>
-                                        </div>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                        <div>
                             <label>PIN</label>
                             <input type="text" asp-for="Pin" class="form-control" placeholder="Search PIN..." />
                         </div>
@@ -82,13 +67,6 @@
                     </div>
                 </form>
             </div>
-            <div class="at-legend">
-                <span><b>[B]</b> Missing 2+2 records</span>
-                <span><b>[C1]</b> Gate Entry 30m Early</span>
-                <span><b>[C2]</b> Gate Exit &gt; 30m after Attend Out</span>
-                <span><b>[D1]</b> Late Arrival</span>
-                <span><b>[D2]</b> Early Departure</span>
-            </div>
         </div>
 
         <!-- Export Modal -->
@@ -105,7 +83,6 @@
                             <input type="hidden" name="factory" id="exportFactory" />
                             <input type="hidden" name="bu"      id="exportBU" />
                             <input type="hidden" name="pin"     id="exportPin" />
-                            <div id="exportSelectedTypesContainer" style="display:none"></div>
 
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="selectAllColumns" checked>
@@ -120,7 +97,6 @@
                                         ("Dept Name", "Dept"),
                                         ("PIN",       "PIN"),
                                         ("Name",      "Name"),
-                                        ("Type",      "Type"),
                                         ("Shift Date","Shift Date"),
                                         ("Gate In",   "Gate In"),
                                         ("Attend In", "Attend In"),
@@ -159,7 +135,6 @@
                             <th>Dept</th>
                             <th>PIN</th>
                             <th>Name</th>
-                            <th>Type</th>
                             <th>Shift Date</th>
                             <th>Gate In</th>
                             <th>Attend In</th>
@@ -177,7 +152,6 @@
                                 <td><div class="skeleton skeleton-text" style="width:120px"></div></td>
                                 <td><div class="skeleton skeleton-text" style="width:70px"></div></td>
                                 <td><div class="skeleton skeleton-text" style="width:150px"></div></td>
-                                <td><div class="skeleton skeleton-text" style="width:40px"></div></td>
                                 <td><div class="skeleton skeleton-text" style="width:90px"></div></td>
                                 <td><div class="skeleton skeleton-text"></div></td>
                                 <td><div class="skeleton skeleton-text"></div></td>
@@ -226,17 +200,6 @@
             
             if (window.ZKBioUi) {
                 ZKBioUi.initSelectAllCheckbox('#selectAllColumns', '.column-checkbox');
-
-                ZKBioUi.initTypeMultiSelect({
-                    buttonSelector: '#typeDropdownBtn',
-                    menuSelector: '#typeDropdownMenu',
-                    checkboxSelector: '[name="SelectedTypes"]',
-                    emptyText: '-- All --',
-                    labelBuilder: function ($checkbox) {
-                        return $checkbox.next('label').text();
-                    }
-                });
-
                 ZKBioUi.initSimpleDropdown('#btnExportToggle', '#exportMenuDropdown');
             } else {
                 console.warn("ZKBioUi script not found or not initialized yet.");
@@ -250,11 +213,6 @@
             $('#exportFactory').val($('[name="Factory"]').val());
             $('#exportBU')     .val($('[name="BU"]').val());
             $('#exportPin')    .val($('[name="Pin"]').val());
-
-            $('#exportSelectedTypesContainer').empty();
-            $('[name="SelectedTypes"]:checked').each(function() {
-                $('<input type="hidden" name="selectedTypes">').val($(this).val()).appendTo('#exportSelectedTypesContainer');
-            });
 
             $('#exportForm').attr('action', '/api/export/attendance/' + type);
             $('#exportModalLabel').text('Export — ' + type.toUpperCase());
@@ -280,7 +238,7 @@
 
             function renderRows(rows) {
                 if (!rows || rows.length === 0) {
-                    $tbody.html('<tr><td colspan="12" class="at-empty">No data found for the selected date.</td></tr>');
+                    $tbody.html('<tr><td colspan="11" class="at-empty">No data found for the selected date.</td></tr>');
                     return;
                 }
                 var html = rows.map(function(item) {
@@ -295,7 +253,6 @@
                         + '<td>' + (item.deptName || '-') + '</td>'
                         + '<td>' + (item.pin || '-') + '</td>'
                         + '<td>' + (item.fullName || '-') + '</td>'
-                        + '<td>' + (item.type || '-') + '</td>'
                         + '<td>' + (item.date || '-') + '</td>'
                         + '<td>' + (item.gateIn || '-') + '</td>'
                         + '<td>' + (item.attendIn || '-') + '</td>'
@@ -360,7 +317,7 @@
                         })
                         .catch(function(err) {
                             console.error("Fetch failed:", err);
-                            $tbody.html('<tr><td colspan="12" class="at-empty">Error loading data. Please try again.</td></tr>');
+                            $tbody.html('<tr><td colspan="11" class="at-empty">Error loading data. Please try again.</td></tr>');
                             $total.text('0 records');
                             renderPagination(1, 0);
                         })

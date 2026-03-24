@@ -12,11 +12,9 @@ public static class CacheKeyHelper
         DateTime reportDate,
         string? pin,
         string? factory,
-        string? bu,
-        IEnumerable<string>? selectedTypes)
+        string? bu)
     {
-        var typesStr = selectedTypes is null ? "" : string.Join("-", selectedTypes);
-        return $"Attendance_Filtered_{reportDate:yyyyMMdd}_{pin ?? ""}_{factory}_{bu}_{typesStr}";
+        return $"Attendance_Filtered_{reportDate:yyyyMMdd}_{pin ?? ""}_{factory}_{bu}";
     }
 
     public static string ContractorAttendance(DateTime fromDate, DateTime toDate, string? pin) =>

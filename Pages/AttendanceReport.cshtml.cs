@@ -33,11 +33,6 @@ public class AttendanceReportModel : PageModel
     public string? BU { get; set; }
 
     [BindProperty(SupportsGet = true)]
-    public List<string> SelectedTypes { get; set; } = new();
-
-    public List<string> Types { get; set; } = new();
-
-    [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
 
     public int PageSize { get; set; } = 50;
@@ -52,7 +47,6 @@ public class AttendanceReportModel : PageModel
         ViewData["StartLoading"] = true;
         Factories = AttendanceOptions.Factories.ToList();
         BUs = AttendanceOptions.BUs.ToList();
-        Types = AttendanceOptions.Types.ToList();
         ReportDate ??= DateTime.Today.AddDays(-1);
     }
 
@@ -60,7 +54,6 @@ public class AttendanceReportModel : PageModel
     {
         Factories = AttendanceOptions.Factories.ToList();
         BUs = AttendanceOptions.BUs.ToList();
-        Types = AttendanceOptions.Types.ToList();
         ReportDate ??= DateTime.Today.AddDays(-1);
 
         try
@@ -84,13 +77,12 @@ public class AttendanceReportModel : PageModel
                 ReportDate.Value,
                 Pin,
                 Factory,
-                BU,
-                SelectedTypes);
+                BU);
 
             if (!_cache.TryGetValue(filterKey, out List<AttendanceRecord>? filteredList) || filteredList == null)
             {
                 filteredList = AttendanceFilterHelper
-                    .ApplyFilters(allExceptions, Factory, BU, SelectedTypes)
+                    .ApplyFilters(allExceptions, Factory, BU)
                     .ToList();
                 _cache.Set(filterKey, filteredList, TimeSpan.FromMinutes(30));
             }
@@ -111,7 +103,6 @@ public class AttendanceReportModel : PageModel
                     item.DeptName,
                     item.Pin,
                     item.FullName,
-                    Type = AttendanceFilterHelper.FormatEffectiveType(item),
                     Date = item.Date.ToString("yyyy-MM-dd"),
                     GateIn = item.GateIn?.ToString("HH:mm:ss") ?? "-",
                     AttendIn = item.AttendIn?.ToString("HH:mm:ss") ?? "-",
@@ -150,9 +141,5 @@ public class AttendanceReportModel : PageModel
         return new JsonResult(new List<AccTransaction>());
     }
 
-    public string GetTypeLabel(string type)
-    {
-        return AttendanceFilterHelper.GetTypeLabel(type);
-    }
 }
 

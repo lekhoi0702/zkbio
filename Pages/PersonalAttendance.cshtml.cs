@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using ZkbioDashboard.Helpers;
 using ZkbioDashboard.Models;
 using ZkbioDashboard.Services;
 
@@ -40,8 +41,7 @@ public class PersonalAttendanceModel : PageModel
     {
         if (DateTime.TryParse(date, out var d))
         {
-            var start = d.Date.AddHours(4);
-            var end = start.AddDays(1).AddHours(2);
+            var (start, end) = ShiftWindowPolicy.GetAccessHistoryDetailWindow(d);
             var logs = await _transactionService.GetTransactionsByRangeAsync(pin, start, end);
             return new JsonResult(logs);
         }

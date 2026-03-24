@@ -82,7 +82,8 @@ public class AccessLevelModel : PageModel
                 x.Pin,
                 x.FullName,
                 DepartmentList = x.DepartmentList,
-                AccessLevelList = x.AccessLevelList
+                AccessLevelList = x.AccessLevelList,
+                UpdateTimeDisplay = x.UpdateTimeDisplay
             }),
             totalCount = TotalCount,
             pageNumber = PageNumber,

@@ -25,9 +25,5 @@ public static class AttendanceOptions
         "JT2"
     };
 
-    public static readonly IReadOnlyList<string> Types = new[]
-    {
-        "B", "C1", "C2", "D1", "D2"
-    };
 }
 

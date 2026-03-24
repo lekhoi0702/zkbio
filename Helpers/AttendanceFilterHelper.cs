@@ -9,24 +9,6 @@ public static class AttendanceFilterHelper
 {
     private static readonly TimeSpan ThirtyMinutes = TimeSpan.FromMinutes(30);
 
-    private static readonly IReadOnlyDictionary<string, string> TypeLabels = new Dictionary<string, string>
-    {
-        ["B"]  = "[B] Missing the required 2+2 clock-in/clock-out records",
-        ["C1"] = "[C1] Gate Entry 30 Minutes Early",
-        ["C2"] = "[C2] Gate Exit > 30 minutes after Attend Out",
-        ["D1"] = "[D1] Late Arrival",
-        ["D2"] = "[D2] Early Departure"
-    };
-
-    private static readonly IReadOnlyDictionary<string, string> ContractorTypeLabels = new Dictionary<string, string>
-    {
-        ["B"]  = "[B] Missing required 2+2 records",
-        ["C1"] = "[C1] Gate Entry 30m Early",
-        ["C2"] = "[C2] Gate Exit > 30m after Attend Out",
-        ["D1"] = "[D1] Late Arrival",
-        ["D2"] = "[D2] Early Departure"
-    };
-
     // -------------------------------------------------------------------------
     // Core logic — single source of truth for all type code evaluation
     // -------------------------------------------------------------------------
@@ -73,15 +55,6 @@ public static class AttendanceFilterHelper
         return codes;
     }
 
-    /// <summary>
-    /// Formats the effective type codes as a bracketed string, e.g. "[B][C1][D2]"
-    /// </summary>
-    public static string FormatEffectiveType(AttendanceRecord record)
-    {
-        var codes = ComputeEffectiveCodes(record).ToList();
-        return codes.Count == 0 ? string.Empty : string.Concat(codes.Select(c => $"[{c}]"));
-    }
-
     // -------------------------------------------------------------------------
     // Filtering / extraction helpers
     // -------------------------------------------------------------------------
@@ -89,8 +62,7 @@ public static class AttendanceFilterHelper
     public static IEnumerable<AttendanceRecord> ApplyFilters(
         IEnumerable<AttendanceRecord> records,
         string? factory,
-        string? bu,
-        IEnumerable<string>? selectedTypes)
+        string? bu)
     {
         // Include any record that has at least one effective code
         var filtered = records.Where(r => ComputeEffectiveCodes(r).Any());
@@ -101,47 +73,8 @@ public static class AttendanceFilterHelper
         if (!string.IsNullOrEmpty(bu))
             filtered = filtered.Where(r => IsBUMatch(r, factory, bu));
 
-        filtered = ApplyTypeFilter(filtered, selectedTypes);
-
         return filtered;
     }
-
-    public static IEnumerable<AttendanceRecord> ApplyTypeFilter(
-        IEnumerable<AttendanceRecord> records,
-        IEnumerable<string>? selectedTypes)
-    {
-        var typeList = selectedTypes?.ToList();
-        if (typeList?.Count > 0)
-        {
-            return records.Where(r =>
-                ComputeEffectiveCodes(r).Any(code => typeList.Contains(code)));
-        }
-
-        return records;
-    }
-
-    public static List<string> ExtractTypeCodes(IEnumerable<AttendanceRecord> records)
-    {
-        return records
-            .SelectMany(ComputeEffectiveCodes)
-            .Distinct()
-            .OrderBy(t => t)
-            .ToList();
-    }
-
-    /// <summary>Returns effective codes for a single record (alias for ComputeEffectiveCodes).</summary>
-    public static IEnumerable<string> GetTypeCodes(AttendanceRecord record) =>
-        ComputeEffectiveCodes(record);
-
-    // -------------------------------------------------------------------------
-    // Label helpers
-    // -------------------------------------------------------------------------
-
-    public static string GetTypeLabel(string type) =>
-        TypeLabels.TryGetValue(type, out var label) ? label : type;
-
-    public static string GetContractorTypeLabel(string type) =>
-        ContractorTypeLabels.TryGetValue(type, out var label) ? label : type;
 
     // -------------------------------------------------------------------------
     // Factory / BU match helpers
@@ -174,10 +107,6 @@ public static class AttendanceFilterHelper
 
         return bu == selectedBU;
     }
-
-    // -------------------------------------------------------------------------
-    // Internal helpers
-    // -------------------------------------------------------------------------
 
     private static IEnumerable<string> ParseEvaluationString(string? evaluation)
     {

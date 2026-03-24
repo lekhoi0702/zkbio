@@ -35,12 +35,8 @@ public class ContractorAttendanceModel : PageModel
     [BindProperty(SupportsGet = true)]
     public string? BU { get; set; }
 
-    [BindProperty(SupportsGet = true)]
-    public List<string> SelectedTypes { get; set; } = new();
-
     public List<string> Factories { get; set; } = new();
     public List<string> BUs { get; set; } = new();
-    public List<string> Types { get; set; } = new();
 
     [BindProperty(SupportsGet = true)]
     public int PageNumber { get; set; } = 1;
@@ -53,7 +49,6 @@ public class ContractorAttendanceModel : PageModel
     {
         Factories = AttendanceOptions.Factories.ToList();
         BUs = AttendanceOptions.BUs.ToList();
-        Types = AttendanceOptions.Types.ToList();
         FromDate ??= DateTime.Today.AddDays(-1);
         ToDate ??= DateTime.Today.AddDays(1).AddSeconds(-1);
 
@@ -94,14 +89,11 @@ public class ContractorAttendanceModel : PageModel
                     .ToList();
                 _cache.Set(cacheKey, allRecords, TimeSpan.FromMinutes(30));
             }
-            // Types are now static from AttendanceOptions.Types
-
             var filtered = allRecords.AsEnumerable();
             if (!string.IsNullOrEmpty(Factory))
                 filtered = filtered.Where(r => AttendanceFilterHelper.IsFactoryMatch(r, Factory));
             if (!string.IsNullOrEmpty(BU))
                 filtered = filtered.Where(r => AttendanceFilterHelper.IsBUMatch(r, Factory, BU));
-            filtered = AttendanceFilterHelper.ApplyTypeFilter(filtered, SelectedTypes);
 
             var filteredList = filtered.ToList();
             TotalCount = filteredList.Count;
@@ -117,17 +109,11 @@ public class ContractorAttendanceModel : PageModel
         }
     }
 
-    public string GetTypeLabel(string type)
-    {
-        return AttendanceFilterHelper.GetContractorTypeLabel(type);
-    }
-
     public async Task<JsonResult> OnGetDetailsAsync(string pin, string date)
     {
         if (DateTime.TryParse(date, out var d))
         {
-            var start = d.Date.AddHours(4);
-            var end = start.AddDays(1).AddHours(2);
+            var (start, end) = ShiftWindowPolicy.GetAccessHistoryDetailWindow(d);
             var logs = await _transactionService.GetTransactionsByRangeAsync(pin, start, end);
             return new JsonResult(logs);
         }

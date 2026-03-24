@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using System.Net.NetworkInformation;
 using ZkbioDashboard.Helpers;
 using ZkbioDashboard.Models;
 using ZkbioDashboard.Services;
@@ -10,10 +9,12 @@ namespace ZkbioDashboard.Pages;
 public class DeviceModel : PageModel
 {
     private readonly ITransactionService _transactionService;
+    private readonly IDeviceStatusService _deviceStatusService;
 
-    public DeviceModel(ITransactionService transactionService)
+    public DeviceModel(ITransactionService transactionService, IDeviceStatusService deviceStatusService)
     {
         _transactionService = transactionService;
+        _deviceStatusService = deviceStatusService;
     }
 
     [BindProperty(SupportsGet = true)]
@@ -60,60 +61,20 @@ public class DeviceModel : PageModel
     {
         ViewData["StartLoading"] = true;
         Factories = AttendanceOptions.Factories.ToList();
-        var data = (await _transactionService.GetDevicesAsync(Factory)).ToList();
-        var filtered = ApplyFilters(data);
-
-        if (!string.IsNullOrWhiteSpace(Status))
-        {
-            var withStatus = await ApplyStatusAsync(filtered);
-            var statusFiltered = ApplyStatusFilter(withStatus);
-            TotalCount = statusFiltered.Count;
-            Records = statusFiltered
-                .Skip((PageNumber - 1) * PageSize)
-                .Take(PageSize)
-                .ToList();
-        }
-        else
-        {
-            TotalCount = filtered.Count;
-            var paged = filtered
-                .Skip((PageNumber - 1) * PageSize)
-                .Take(PageSize)
-                .ToList();
-            Records = await ApplyStatusAsync(paged);
-        }
+        var result = await LoadPageDataAsync();
+        TotalCount = result.TotalCount;
+        Records = result.Records;
     }
 
     public async Task<JsonResult> OnGetDataAsync()
     {
         Factories = AttendanceOptions.Factories.ToList();
-        var data = (await _transactionService.GetDevicesAsync(Factory)).ToList();
-        var filtered = ApplyFilters(data);
-        List<DeviceRecord> pageData;
-
-        if (!string.IsNullOrWhiteSpace(Status))
-        {
-            var withStatus = await ApplyStatusAsync(filtered);
-            var statusFiltered = ApplyStatusFilter(withStatus);
-            TotalCount = statusFiltered.Count;
-            pageData = statusFiltered
-                .Skip((PageNumber - 1) * PageSize)
-                .Take(PageSize)
-                .ToList();
-        }
-        else
-        {
-            TotalCount = filtered.Count;
-            var paged = filtered
-                .Skip((PageNumber - 1) * PageSize)
-                .Take(PageSize)
-                .ToList();
-            pageData = await ApplyStatusAsync(paged);
-        }
+        var result = await LoadPageDataAsync();
+        TotalCount = result.TotalCount;
 
         return new JsonResult(new
         {
-            data = pageData.Select(d => new
+            data = result.Records.Select(d => new
             {
                 d.DevAlias,
                 d.SN,
@@ -128,6 +89,30 @@ public class DeviceModel : PageModel
             pageNumber = PageNumber,
             totalPages = TotalPages
         });
+    }
+
+    private async Task<(List<DeviceRecord> Records, int TotalCount)> LoadPageDataAsync()
+    {
+        var data = (await _transactionService.GetDevicesAsync(Factory)).ToList();
+        var filtered = ApplyFilters(data);
+
+        if (!string.IsNullOrWhiteSpace(Status))
+        {
+            var withStatus = await _deviceStatusService.ApplyStatusAsync(filtered);
+            var statusFiltered = ApplyStatusFilter(withStatus);
+            var page = statusFiltered
+                .Skip((PageNumber - 1) * PageSize)
+                .Take(PageSize)
+                .ToList();
+            return (page, statusFiltered.Count);
+        }
+
+        var paged = filtered
+            .Skip((PageNumber - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+        var withPageStatus = await _deviceStatusService.ApplyStatusAsync(paged);
+        return (withPageStatus, filtered.Count);
     }
 
     private List<DeviceRecord> ApplyFilters(IEnumerable<DeviceRecord> records)
@@ -182,73 +167,5 @@ public class DeviceModel : PageModel
         return records
             .Where(d => d.Status.Equals(status, StringComparison.OrdinalIgnoreCase))
             .ToList();
-    }
-
-    private static async Task<List<DeviceRecord>> ApplyStatusAsync(List<DeviceRecord> devices)
-    {
-        if (devices.Count == 0)
-            return devices;
-
-        var throttler = new SemaphoreSlim(20);
-        var tasks = devices.Select(async d =>
-        {
-            await throttler.WaitAsync();
-            try
-            {
-                var status = await GetPingStatusAsync(d.IpAddress);
-                return new DeviceRecord
-                {
-                    DevAlias = d.DevAlias,
-                    SN = d.SN,
-                    AreaName = d.AreaName,
-                    IpAddress = d.IpAddress,
-                    Status = status,
-                    DeviceName = d.DeviceName,
-                    IsRegistrationDevice = d.IsRegistrationDevice,
-                    FwVersion = d.FwVersion
-                };
-            }
-            finally
-            {
-                throttler.Release();
-            }
-        });
-
-        return (await Task.WhenAll(tasks)).ToList();
-    }
-
-    private static async Task<string> GetPingStatusAsync(string? ipAddress)
-    {
-        if (string.IsNullOrWhiteSpace(ipAddress))
-            return "Offline";
-
-        try
-        {
-            const int attempts = 3;
-            const int timeoutMs = 3000;
-
-            using var ping = new Ping();
-            for (var i = 0; i < attempts; i++)
-            {
-                try
-                {
-                    var reply = await ping.SendPingAsync(ipAddress.Trim(), timeoutMs);
-                    if (reply.Status == IPStatus.Success)
-                        return "Online";
-                }
-                catch
-                {
-                    // swallow individual ping errors and retry
-                }
-
-                await Task.Delay(150);
-            }
-
-            return "Offline";
-        }
-        catch
-        {
-            return "Offline";
-        }
     }
 }

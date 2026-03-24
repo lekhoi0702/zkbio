@@ -61,12 +61,13 @@ public class TransactionService : ITransactionService
         if (_cache.TryGetValue<(IReadOnlyList<AccTransaction> Data, int TotalCount)>(cacheKey, out var cachedPage))
             return (cachedPage.Data, cachedPage.TotalCount);
 
-        var (whereSql, parameters) = TransactionQueryHelper.BuildWhereClause(filter);
+        var (effectiveFilter, serverPredicate) = PrepareAllTransactionsFilter(filter);
+        var (whereSql, parameters) = TransactionQueryHelper.BuildWhereClause(effectiveFilter);
 
         string countSql = "SELECT COUNT(*) FROM acc_transaction" + whereSql;
         string dataSql  = TransactionQueryHelper.TransactionSelectSql + whereSql + " ORDER BY event_time DESC";
 
-        var tasks = GetConnectionStrings().Select(async cs =>
+        var tasks = GetConnectionStrings().Where(serverPredicate).Select(async cs =>
         {
             using IDbConnection db = new SqlConnection(cs);
             int    count = await db.ExecuteScalarAsync<int>(countSql, parameters);
@@ -90,10 +91,11 @@ public class TransactionService : ITransactionService
 
     public async Task<IEnumerable<AccTransaction>> GetTransactionsForExportAsync(TransactionFilter filter)
     {
-        var (whereSql, parameters) = TransactionQueryHelper.BuildWhereClause(filter);
+        var (effectiveFilter, serverPredicate) = PrepareAllTransactionsFilter(filter);
+        var (whereSql, parameters) = TransactionQueryHelper.BuildWhereClause(effectiveFilter);
         string dataSql = TransactionQueryHelper.TransactionSelectSql + whereSql + " ORDER BY event_time DESC";
 
-        var tasks = GetConnectionStrings().Select(async cs =>
+        var tasks = GetConnectionStrings().Where(serverPredicate).Select(async cs =>
         {
             using IDbConnection db = new SqlConnection(cs);
             return await db.QueryAsync<AccTransaction>(dataSql, parameters);
@@ -106,6 +108,36 @@ public class TransactionService : ITransactionService
             .OrderByDescending(t => t.EventTime);
     }
 
+    private static (TransactionFilter EffectiveFilter, Func<string, bool> ServerPredicate) PrepareAllTransactionsFilter(TransactionFilter filter)
+    {
+        var normalized = new TransactionFilter
+        {
+            FromDate = filter.FromDate,
+            ToDate = filter.ToDate,
+            AreaName = filter.AreaName,
+            DeptName = filter.DeptName,
+            Pin = filter.Pin,
+            Name = filter.Name,
+            DevAlias = filter.DevAlias,
+            EventPoint = filter.EventPoint,
+            Status = filter.Status
+        };
+
+        if (normalized.AreaName != null &&
+            normalized.AreaName.Trim().Equals("SHIMMER", StringComparison.OrdinalIgnoreCase))
+        {
+            // SHIMMER in All Transactions is defined by server 3.45, not by area_name text.
+            normalized.AreaName = null;
+            return (normalized, cs =>
+            {
+                var serverIp = DepartmentHelper.GetServerIp(cs);
+                return serverIp.Contains(ServerConstants.Server345IpPattern);
+            });
+        }
+
+        return (normalized, _ => true);
+    }
+
     // -------------------------------------------------------------------------
     // Attendance Report (Exception Times)
     // -------------------------------------------------------------------------
@@ -113,11 +145,8 @@ public class TransactionService : ITransactionService
     public async Task<IEnumerable<AttendanceRecord>> GetAttendanceReportAsync(
         DateTime date, string? pin = null, string? factory = null)
     {
-        // Report window: 04:00 to catch early Ca 4 (05:30) through next 04:00
-        var reportStart = date.Date.AddHours(4);
-        var reportEnd   = reportStart.AddDays(1);
-        var queryStart  = reportStart.AddHours(-12);
-        var queryEnd    = reportStart.AddHours(36);
+        var (reportStart, reportEnd) = ShiftWindowPolicy.GetDailyReportWindow(date);
+        var (queryStart, queryEnd) = ShiftWindowPolicy.GetDailyQueryWindow(date);
 
         // ── Phase 1: collect raw data from every server ──────────────────────
         // Employees can touch gate devices on one server and ATT devices on
@@ -219,6 +248,7 @@ public class TransactionService : ITransactionService
     {
         fromDate = fromDate.Date;
         toDate   = toDate.Date;
+        var (queryStart, queryEnd) = ShiftWindowPolicy.GetDateRangeQueryWindow(fromDate, toDate);
 
         var allRecords = new List<AttendanceRecord>();
 
@@ -232,9 +262,6 @@ public class TransactionService : ITransactionService
             var serverIp     = DepartmentHelper.GetServerIp(connStr);
             var factoryCluster = ResolveFactoryClusterByServerIp(serverIp);
             var rootNames    = ServerConstants.GetPersonalRootNames(serverIp);
-
-            var queryStart = fromDate.AddHours(-12);
-            var queryEnd   = toDate.AddDays(1).AddHours(36);
 
             var sql = @"
                 SELECT 
@@ -254,8 +281,7 @@ public class TransactionService : ITransactionService
 
             for (var date = fromDate; date <= toDate; date = date.AddDays(1))
             {
-                var reportStart = date.AddHours(4);
-                var reportEnd   = reportStart.AddDays(1);
+                var (reportStart, reportEnd) = ShiftWindowPolicy.GetDailyReportWindow(date);
 
                 var dailyTransactions = pinTransactions
                     .Where(t => (DateTime)t.EventTime >= reportStart && (DateTime)t.EventTime < reportEnd)
@@ -271,6 +297,7 @@ public class TransactionService : ITransactionService
                         Date = date, Pin = pin,
                         FullName  = (string)info.FullName,
                         DeptName  = (string)info.DeptName,
+                        Server = serverIp,
                         Evaluation = ""
                     };
                 }
@@ -279,7 +306,7 @@ public class TransactionService : ITransactionService
                     record = BuildAttendanceRecord(
                         pin, date.Date, pinTransactions,
                         reportStart, reportEnd,
-                        deptDict, rootNames, deptMapByCode, deptMapByName, factoryCluster);
+                        deptDict, rootNames, deptMapByCode, deptMapByName, factoryCluster, serverIp);
                 }
 
                 if (record != null)
@@ -287,7 +314,19 @@ public class TransactionService : ITransactionService
             }
         }
 
-        return allRecords.GroupBy(r => r.Date).Select(g => g.First()).OrderBy(r => r.Date);
+        return allRecords
+            .GroupBy(r => r.Date)
+            .Select(g => g
+                .OrderByDescending(r =>
+                    (r.FirstPunch.HasValue ? 1 : 0) +
+                    (r.LastPunch.HasValue ? 1 : 0) +
+                    (r.GateIn.HasValue ? 1 : 0) +
+                    (r.AttendIn.HasValue ? 1 : 0) +
+                    (r.AttendOut.HasValue ? 1 : 0) +
+                    (r.GateOut.HasValue ? 1 : 0))
+                .ThenByDescending(r => r.LastPunch)
+                .First())
+            .OrderBy(r => r.Date);
     }
 
     // -------------------------------------------------------------------------
@@ -297,10 +336,8 @@ public class TransactionService : ITransactionService
     public async Task<IEnumerable<AttendanceRecord>> GetContractorsReportAsync(
         DateTime date, string? pin = null, string? factory = null)
     {
-        var reportStart = date.Date.AddHours(4);
-        var reportEnd   = reportStart.AddDays(1);
-        var queryStart  = reportStart.AddHours(-12);
-        var queryEnd    = reportStart.AddHours(36);
+        var (reportStart, reportEnd) = ShiftWindowPolicy.GetDailyReportWindow(date);
+        var (queryStart, queryEnd) = ShiftWindowPolicy.GetDailyQueryWindow(date);
 
         var allRecords = new List<AttendanceRecord>();
 
@@ -424,45 +461,68 @@ public class TransactionService : ITransactionService
                 auth_department.name AS DepartmentName,
                 pers_person.pin AS Pin,
                 CONCAT(pers_person.last_name, ' ', pers_person.name) AS FullName,
-                acc_level.name AS AccessLevelName
+                acc_level.name AS AccessLevelName,
+                pers_card_latest.UpdateTime AS UpdateTime
             FROM pers_person
             INNER JOIN auth_department ON pers_person.auth_dept_id = auth_department.id
             INNER JOIN acc_level_person ON pers_person.id = acc_level_person.pers_person_id
             INNER JOIN acc_level ON acc_level.id = acc_level_person.level_id
+            LEFT JOIN (
+                SELECT person_pin, MAX(update_time) AS UpdateTime
+                FROM pers_card
+                GROUP BY person_pin
+            ) pers_card_latest ON pers_card_latest.person_pin = pers_person.pin
             WHERE (@Pin IS NULL OR pers_person.pin LIKE @Pin)";
 
         var tasks = GetConnectionStrings().Select(async connStr =>
         {
             using var connection = new SqlConnection(connStr);
-            return await connection.QueryAsync<dynamic>(sql, new
+            var serverIp = DepartmentHelper.GetServerIp(connStr);
+            var rows = await connection.QueryAsync<dynamic>(sql, new
             {
                 Pin = string.IsNullOrWhiteSpace(pin) ? null : $"%{pin}%"
+            });
+            return rows.Select(r => new
+            {
+                ServerIp = serverIp,
+                DepartmentName = (string?)r.DepartmentName ?? "",
+                Pin = (string?)r.Pin ?? "",
+                FullName = (string?)r.FullName ?? "",
+                AccessLevelName = (string?)r.AccessLevelName ?? "",
+                UpdateTime = r.UpdateTime is DateTime dt ? (DateTime?)dt : null
             });
         });
 
         var results = await Task.WhenAll(tasks);
         var merged = results.SelectMany(r => r)
-            .GroupBy(r => (string)r.Pin, StringComparer.OrdinalIgnoreCase)
+            .Where(r => !string.IsNullOrWhiteSpace(r.Pin))
+            .GroupBy(r => new { r.Pin, r.ServerIp })
             .Select(g =>
             {
-                var fullName = g.Select(x => (string)x.FullName).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "";
-                var departments = g.Select(x => (string)x.DepartmentName)
+                var fullName = g.Select(x => x.FullName).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "";
+                var departments = g.Select(x => x.DepartmentName)
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(x => x)
                     .ToList();
-                var accessLevels = g.Select(x => (string)x.AccessLevelName)
+                var accessLevels = g.Select(x => x.AccessLevelName)
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(x => x)
                     .ToList();
+                var updateTime = g
+                    .Where(x => x.UpdateTime.HasValue)
+                    .Select(x => x.UpdateTime!.Value)
+                    .DefaultIfEmpty()
+                    .Max();
 
                 return new AccessLevelRecord
                 {
-                    Pin = g.Key,
+                    Pin = g.Key.Pin,
                     FullName = fullName,
                     Departments = departments,
-                    AccessLevels = accessLevels
+                    AccessLevels = accessLevels,
+                    UpdateTime = updateTime == default ? null : updateTime
                 };
             })
             .OrderBy(x => x.DepartmentList)
@@ -715,7 +775,8 @@ public class TransactionService : ITransactionService
         IEnumerable<string> rootNames,
         Dictionary<string, string> deptMapByCode,
         Dictionary<string, string> deptMapByName,
-        string factoryCluster)
+        string factoryCluster,
+        string? server = null)
     {
         var dailyTransactions = allPinTransactions
             .Where(t => (DateTime)t.EventTime >= reportStart && (DateTime)t.EventTime < reportEnd)
@@ -772,6 +833,7 @@ public class TransactionService : ITransactionService
             DeptName    = (string)shiftStartPunch.DeptName,
             Pin         = pin,
             FullName    = (string)shiftStartPunch.FullName,
+            Server      = server ?? string.Empty,
             Date        = reportDate,
             Factory     = factoryName,
             FactoryCluster = factoryCluster,

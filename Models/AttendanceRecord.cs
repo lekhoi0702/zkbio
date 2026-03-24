@@ -5,6 +5,7 @@ public class AttendanceRecord
     public string DeptName { get; set; } = string.Empty;
     public string Pin { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
+    public string Server { get; set; } = string.Empty;
     public string Factory { get; set; } = string.Empty;
     public string FactoryCluster { get; set; } = string.Empty;
     public string BU { get; set; } = string.Empty;

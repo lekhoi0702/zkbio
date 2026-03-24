@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
   <!-- Local overrides -->
   <link rel="stylesheet" href="~/css/site.css">
+  <link rel="stylesheet" href="~/css/transaction-details.css" asp-append-version="true">
   <!-- Flatpickr -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
@@ -101,12 +102,6 @@
             </a>
           </li>
           <li class="nav-item">
-            <a href="/bu-type-summary" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/BuTypeSummary" ? "active" : "")">
-              <i class="nav-icon fas fa-chart-bar"></i>
-              <p>BU Type Summary</p>
-            </a>
-          </li>
-          <li class="nav-item">
             <a href="/early-exit" class="nav-link @(ViewContext.RouteData.Values["page"]?.ToString() == "/EarlyExitReport" ? "active" : "")">
               <i class="nav-icon fas fa-sign-out-alt"></i>
               <p>Early Exit</p>
@@ -155,6 +150,7 @@
 <!-- jQuery -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="~/js/site.js" asp-append-version="true"></script>
+<script src="~/js/transaction-details.js" asp-append-version="true"></script>
 <!-- Bootstrap 4 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.6.1/js/bootstrap.bundle.min.js"></script>
 <!-- AdminLTE App -->

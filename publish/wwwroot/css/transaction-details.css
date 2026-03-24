@@ -1,0 +1,137 @@
+.txd-modal {
+  border: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 52px rgba(15, 23, 42, 0.18);
+}
+
+.txd-head {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 10px 14px;
+  background: #ffffff;
+}
+
+.txd-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.txd-sub {
+  margin-left: 8px;
+  font-size: 0.76rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.txd-body {
+  background: #ffffff;
+}
+
+.txd-loading {
+  text-align: center;
+  padding: 30px 12px;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.txd-loading .spinner-border {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-width: 0.16rem;
+  color: #15803d;
+}
+
+.txd-loading p {
+  margin: 8px 0 0;
+}
+
+.txd-table {
+  font-size: 0.8rem;
+}
+
+.txd-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.txd-table tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+.txd-table tbody tr:nth-child(even) {
+  background: #f5f8fb;
+}
+
+.txd-table tbody tr:hover {
+  background: rgba(21, 128, 61, 0.07) !important;
+}
+
+.txd-table tbody td {
+  padding: 5px 10px;
+  color: #0f172a;
+  border-top: 0;
+  white-space: nowrap;
+}
+
+.txd-pill {
+  display: inline;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.txd-pill-info {
+  color: #0369a1;
+}
+
+.txd-pill-warn {
+  color: #b45309;
+}
+
+.txd-pill-ok {
+  color: #15803d;
+}
+
+.txd-pill-mute {
+  color: #64748b;
+}
+
+.txd-pill-bad {
+  color: #b91c1c;
+}
+
+.txd-foot {
+  border-top: 1px solid #f1f5f9;
+  padding: 8px 14px;
+  background: #ffffff;
+}
+
+.txd-btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #dbe3ee;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.txd-btn:hover {
+  background: #f8fafc;
+}
